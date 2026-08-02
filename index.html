@@ -181,6 +181,33 @@ input.code { font-family: var(--mono); text-transform: uppercase; letter-spacing
 }
 .notice.bad { border-color: var(--alarm); background: rgba(255, 77, 61, .1); color: #ffd6d0; }
 
+/* ---------- leaderboard ---------- */
+#board-count b { color: var(--sand); font-family: var(--mono); font-size: 15px; }
+.boardnote { color: var(--mist); font-size: 13.5px; line-height: 1.5; padding: 4px 0; }
+.boardrow {
+  display: flex; align-items: baseline; gap: 10px; padding: 7px 10px;
+  border-radius: 9px; font-size: 14px;
+}
+.boardrow:nth-child(odd) { background: rgba(255, 255, 255, .04); }
+.boardrow .rank { font-family: var(--mono); color: var(--mist); width: 22px; flex: none; }
+.boardrow .who { flex: 1 1 auto; font-weight: 600; }
+.boardrow .who .tag {
+  font-style: normal; font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--mist); border: 1px solid var(--edge); border-radius: 20px; padding: 1px 6px; margin-left: 5px;
+}
+.boardrow .rating { font-family: var(--mono); font-weight: 700; color: var(--sand); }
+.boardrow .rating .prov { font-style: normal; color: var(--mist); font-size: 11px; margin-left: 1px; }
+.boardrow .rec { font-family: var(--mono); font-size: 12px; color: var(--mist); width: 46px; text-align: right; }
+.boardrow.isbot .who { font-weight: 500; color: #b9cdd4; }
+
+.ratingline {
+  display: flex; align-items: center; gap: 6px; margin-top: 6px;
+  font-size: 12.5px; color: var(--mist);
+}
+.ratingline b { font-family: var(--mono); color: var(--foam); }
+.ratingline .up { color: var(--grow); font-family: var(--mono); font-weight: 700; }
+.ratingline .down { color: var(--alarm); font-family: var(--mono); font-weight: 700; }
+
 /* ---------- house rules ---------- */
 .presets { display: flex; gap: 8px; flex-wrap: wrap; }
 .presets .btn { flex: 1 1 auto; }
@@ -842,6 +869,16 @@ input.code { font-family: var(--mono); text-transform: uppercase; letter-spacing
         </label>
         <button class="btn primary" id="btn-solo" style="align-self:flex-end">Deal</button>
       </div>
+    </div>
+
+    <div class="panel paper">
+      <h2>Leaderboard</h2>
+      <p class="sub" id="board-count"></p>
+      <div class="row" style="margin-bottom:10px">
+        <button class="btn small" id="btn-board-all">Everyone</button>
+        <button class="btn small ghost" id="btn-board-humans">People only</button>
+      </div>
+      <div id="board-body"></div>
     </div>
 
     <div class="panel paper">
@@ -2520,6 +2557,14 @@ input.code { font-family: var(--mono); text-transform: uppercase; letter-spacing
     everything: { threshold: null, target: null, rules: { stormSeason: true, pile3: true, openSea: true, jellyfish: true, hurricane: true, tideKey: null, tableLog: true } }
   };
 
+  /* ---------------- shared leaderboard ---------------- */
+  // A tiny Cloudflare Worker keeps ratings and a global game count. Everything
+  // here fails quietly: if it is unreachable the game plays exactly as normal.
+  var LEADERBOARD = {
+    url: 'https://tidefold-ratings.setoeugene.workers.dev',
+    token: 'tidefold00'
+  };
+
   var BOT_NAMES = [
     'Mango Pepsi', 'Mt Dew Trolli', 'Pineapple Sprite', 'Baja Blast Cabo', 'Sprite Tea'
   ];
@@ -2553,6 +2598,10 @@ input.code { font-family: var(--mono); text-transform: uppercase; letter-spacing
     pileRound: null,
     pairSig: undefined,
     fxRound: null,
+    board: null,
+    boardHumansOnly: false,
+    reportedGame: false,
+    ratingChanges: null,
     partyOpen: false,
     partiedFor: {},
     botTimer: null,
@@ -3341,6 +3390,7 @@ input.code { font-family: var(--mono); text-transform: uppercase; letter-spacing
   }
 
   function announcePairs(V, snap) {
+    if (V.phase !== 'gameEnd') App.reportedGame = false;
     if (App.fxRound !== V.roundNo) {
       App.fxRound = V.roundNo;
       App.pairSig = pairSignature(V);
@@ -3843,6 +3893,7 @@ input.code { font-family: var(--mono); text-transform: uppercase; letter-spacing
         if (App.view) renderGame();
       }, 10000);
     }
+    if (V.phase === 'gameEnd') reportGame(V);
     host.classList.remove('hidden');
     host.appendChild(scoreSheet(V));
   }
@@ -3905,6 +3956,7 @@ input.code { font-family: var(--mono); text-transform: uppercase; letter-spacing
       rows.forEach(function (r) {
         var isWinner = over && r.id === V.winnerId;
         var box = el('div', 'score' + (isWinner ? ' win' : (r.mode === 'played' ? ' lose' : '')));
+        var change = (App.ratingChanges || []).filter(function (c) { return c.name === r.name; })[0];
         var top = el('div', 'top');
         top.innerHTML = '<span>' + esc(r.name) + '</span>' +
           (r.bonusApplied ? '<span class="badge hot">colour bonus</span>' : '') +
@@ -3937,6 +3989,13 @@ input.code { font-family: var(--mono); text-transform: uppercase; letter-spacing
           if (row.childNodes.length) entry.appendChild(row);
           lines.appendChild(entry);
         });
+        if (change) {
+          var rl = el('div', 'ratingline');
+          rl.innerHTML = 'Rating <b>' + change.before + '</b> \u2192 <b>' + change.after + '</b> ' +
+            '<span class="' + (change.delta >= 0 ? 'up' : 'down') + '">' +
+            (change.delta >= 0 ? '+' : '') + change.delta + '</span>';
+          top.appendChild(rl);
+        }
         box.appendChild(lines);
 
         // anything that earned nothing still gets shown, so the hand is complete
@@ -4139,6 +4198,105 @@ input.code { font-family: var(--mono); text-transform: uppercase; letter-spacing
     return html;
   }
 
+  /* ---------------- leaderboard ---------------- */
+
+  function boardFetch(path, opts) {
+    if (!LEADERBOARD.url) return Promise.reject(new Error('no leaderboard'));
+    if (typeof fetch !== 'function') return Promise.reject(new Error('no fetch here'));
+    try {
+    var ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    var timer = setTimeout(function () { if (ctl) ctl.abort(); }, 6000);
+    var init = opts || {};
+    if (ctl) init.signal = ctl.signal;
+      return fetch(LEADERBOARD.url.replace(/\/$/, '') + path, init)
+        .then(function (r) {
+          clearTimeout(timer);
+          if (!r.ok) throw new Error('http ' + r.status);
+          return r.json();
+        }, function (e) { clearTimeout(timer); throw e; });
+    } catch (e) {
+      clearTimeout(timer);
+      return Promise.reject(e);
+    }
+  }
+
+  function loadLeaderboard() {
+    var box = $('board-body');
+    if (!box) return;
+    box.innerHTML = '<div class="boardnote">Loading\u2026</div>';
+    boardFetch('/leaderboard').then(function (data) {
+      App.board = data;
+      renderLeaderboard();
+    }, function () {
+      App.board = null;
+      box.innerHTML = '<div class="boardnote">The leaderboard is not reachable right now. ' +
+        'Games still work as normal.</div>';
+      var c = $('board-count');
+      if (c) c.textContent = '';
+    });
+  }
+
+  function renderLeaderboard() {
+    var box = $('board-body');
+    if (!box) return;
+    var data = App.board;
+    if (!data) return;
+
+    var count = $('board-count');
+    if (count) {
+      var n = data.totalGames || 0;
+      count.innerHTML = '<b>' + n.toLocaleString() + '</b> ' +
+        (n === 1 ? 'game played here' : 'games played here');
+    }
+
+    var rows = (data.players || []).filter(function (p) {
+      return App.boardHumansOnly ? !p.bot : true;
+    });
+
+    box.innerHTML = '';
+    if (!rows.length) {
+      box.appendChild(el('div', 'boardnote', App.boardHumansOnly
+        ? 'No rated people yet \u2014 finish a game to appear here.'
+        : 'Nobody has finished a game yet.'));
+      return;
+    }
+
+    rows.forEach(function (p, i) {
+      var row = el('div', 'boardrow' + (p.bot ? ' isbot' : ''));
+      row.innerHTML =
+        '<span class="rank">' + (i + 1) + '</span>' +
+        '<span class="who">' + esc(p.name) + (p.bot ? ' <i class="tag">bot</i>' : '') + '</span>' +
+        '<span class="rating">' + p.rating + (p.provisional ? '<i class="prov">?</i>' : '') + '</span>' +
+        '<span class="rec">' + p.gamesWon + '/' + p.games + '</span>';
+      box.appendChild(row);
+    });
+  }
+
+  // Only the host reports, and only when a game actually finishes.
+  function reportGame(V) {
+    if (!LEADERBOARD.url || !LEADERBOARD.token) return;
+    if (typeof fetch !== 'function') return;
+    if (!(App.mode === 'host' || App.mode === 'solo')) return;
+    if (V.phase !== 'gameEnd') return;
+    if (App.reportedGame) return;
+    App.reportedGame = true;
+
+    var players = V.players.map(function (p) {
+      return { name: p.name, bot: !!p.bot, score: p.total };
+    });
+    if (players.length < 2) return;
+
+    boardFetch('/result', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Token': LEADERBOARD.token },
+      body: JSON.stringify({ players: players })
+    }).then(function (res) {
+      App.ratingChanges = res.changes || null;
+      App.board = null;
+      if (App.view) renderGame();
+    }, function () { /* silence is fine: the game does not depend on this */ });
+  }
+
   /* ---------------- a small celebration ---------------- */
 
   // Names get a numeric suffix when they collide, so "Ester 2" still counts.
@@ -4247,6 +4405,20 @@ input.code { font-family: var(--mono); text-transform: uppercase; letter-spacing
       if (isEster(nameField.value)) esterWatch();
       else delete App.partiedFor['typed'];
     });
+
+    $('btn-board-all').onclick = function () {
+      App.boardHumansOnly = false;
+      $('btn-board-all').classList.remove('ghost');
+      $('btn-board-humans').classList.add('ghost');
+      renderLeaderboard();
+    };
+    $('btn-board-humans').onclick = function () {
+      App.boardHumansOnly = true;
+      $('btn-board-humans').classList.remove('ghost');
+      $('btn-board-all').classList.add('ghost');
+      renderLeaderboard();
+    };
+    try { loadLeaderboard(); } catch (e) { /* never let the board block the menu */ }
 
     $('btn-rules').onclick = openRules;
     $('btn-rules2').onclick = openRules;
