@@ -182,7 +182,14 @@ input.code { font-family: var(--mono); text-transform: uppercase; letter-spacing
 .notice.bad { border-color: var(--alarm); background: rgba(255, 77, 61, .1); color: #ffd6d0; }
 
 /* ---------- leaderboard ---------- */
-#board-count b { color: var(--sand); font-family: var(--mono); font-size: 15px; }
+.bigcount {
+  text-align: center; color: var(--mist); font-size: 12px;
+  letter-spacing: .14em; text-transform: uppercase; margin: 2px 0 14px; line-height: 1.5;
+}
+.bigcount b {
+  display: block; color: var(--sand); font-family: var(--mono); font-weight: 700;
+  font-size: clamp(38px, 11vw, 56px); letter-spacing: -.02em; text-transform: none;
+}
 .boardnote { color: var(--mist); font-size: 13.5px; line-height: 1.5; padding: 4px 0; }
 .boardrow {
   display: flex; align-items: baseline; gap: 10px; padding: 7px 10px;
@@ -846,6 +853,16 @@ input.code { font-family: var(--mono); text-transform: uppercase; letter-spacing
   <!-- ================= MENU ================= -->
   <section id="screen-menu">
     <div class="panel paper">
+      <h2>Leaderboard</h2>
+      <div class="bigcount" id="board-count"></div>
+      <div class="row" style="margin-bottom:10px">
+        <button class="btn small" id="btn-board-all">Everyone</button>
+        <button class="btn small ghost" id="btn-board-humans">People only</button>
+      </div>
+      <div id="board-body"></div>
+    </div>
+
+    <div class="panel paper">
       <h2>Sit down</h2>
       <p class="sub">One player opens a table and reads out the four-letter code. Everyone else joins from their own phone or laptop.</p>
       <label class="field"><span>Your name</span><input id="name" type="text" maxlength="16" placeholder="Caleb Wilson" autocomplete="nickname"></label>
@@ -869,16 +886,6 @@ input.code { font-family: var(--mono); text-transform: uppercase; letter-spacing
         </label>
         <button class="btn primary" id="btn-solo" style="align-self:flex-end">Deal</button>
       </div>
-    </div>
-
-    <div class="panel paper">
-      <h2>Leaderboard</h2>
-      <p class="sub" id="board-count"></p>
-      <div class="row" style="margin-bottom:10px">
-        <button class="btn small" id="btn-board-all">Everyone</button>
-        <button class="btn small ghost" id="btn-board-humans">People only</button>
-      </div>
-      <div id="board-body"></div>
     </div>
 
     <div class="panel paper">
@@ -2544,7 +2551,7 @@ input.code { font-family: var(--mono); text-transform: uppercase; letter-spacing
     { key: 'openSea', name: 'Open Sea',
       blurb: 'Collector cards sit face up in front of their owner. Mermaids and unpaired duos stay hidden.' },
     { key: 'jellyfish', name: 'Jellyfish',
-      blurb: 'Adds five stinging cards. One costs you 3 and two cost 6 \u2014 but gather three and you win the game outright.' },
+      blurb: 'Adds three stinging cards. One costs you 3 and two cost 6 \u2014 but gather all three and you win the game outright.' },
     { key: 'hurricane', name: 'Hurricane Season',
       blurb: 'Adds a single Hurricane card. Play it to trade your whole hand and table with a rival \u2014 it costs you 5 points either way.' },
     { key: 'tableLog', name: 'Table log', notableWhen: 'off',
@@ -2601,6 +2608,8 @@ input.code { font-family: var(--mono); text-transform: uppercase; letter-spacing
     board: null,
     boardHumansOnly: false,
     reportedGame: false,
+    stallTimer: null,
+    stalled: false,
     ratingChanges: null,
     partyOpen: false,
     partiedFor: {},
@@ -2950,9 +2959,53 @@ input.code { font-family: var(--mono); text-transform: uppercase; letter-spacing
   /* ---------------- host loop ---------------- */
   function afterChange() {
     if (!App.state) return;
+    clearTimeout(App.stallTimer);
     App.view = SSP.view(App.state, App.myId);
     pushAll();
     scheduleBot();
+  }
+
+  /* A legal move for whatever phase the game is in. Used to rescue a bot whose
+     own decision failed, and to play a seat for someone who has dropped out. */
+  function safeAction(state) {
+    var p = state.players[state.turn];
+    switch (state.phase) {
+      case 'action':
+        if (state.deck.length) return { type: 'drawTwo' };
+        for (var i = 0; i < state.discards.length; i++) {
+          if (state.discards[i].length) return { type: 'takeDiscard', pile: i };
+        }
+        return { type: 'endTurn' };
+      case 'keep':
+        return { type: 'keepCard', keepIndex: 0, pile: 0 };
+      case 'crabPile':
+        for (var c = 0; c < state.discards.length; c++) {
+          if (state.discards[c].length) return { type: 'crabPickPile', pile: c };
+        }
+        return { type: 'endTurn' };
+      case 'crab':
+        var pile = state.discards[state.crabPile] || [];
+        if (pile.length) return { type: 'crabTake', pile: state.crabPile, cardId: pile[0].id };
+        return { type: 'endTurn' };
+      case 'shark':
+        for (var t = 0; t < state.players.length; t++) {
+          var o = state.players[t];
+          if (o.id === p.id || !o.hand.length) continue;
+          if (state.lastChance && state.lastChance.callerId === o.id) continue;
+          return { type: 'sharkSteal', targetId: o.id, cardIndex: 0 };
+        }
+        return { type: 'endTurn' };
+      case 'hurricane':
+        for (var h = 0; h < state.players.length; h++) {
+          var q = state.players[h];
+          if (q.id === p.id) continue;
+          if (state.lastChance && state.lastChance.callerId === q.id) continue;
+          return { type: 'hurricaneSwap', targetId: q.id };
+        }
+        return { type: 'endTurn' };
+      default:
+        return { type: 'endTurn' };
+    }
   }
 
   function scheduleBot() {
@@ -2964,19 +3017,43 @@ input.code { font-family: var(--mono); text-transform: uppercase; letter-spacing
     if (!cur || !cur.bot) return;
     App.botTimer = setTimeout(function () {
       if (!App.state || App.state.players[App.state.turn] !== cur) return;
-      var action = BOT.decide(App.state, App.state.turn);
-      var res = SSP.act(App.state, cur.id, action);
-      if (!res.ok) { SSP.act(App.state, cur.id, { type: 'endTurn' }); }
+      var res;
+      try {
+        res = SSP.act(App.state, cur.id, BOT.decide(App.state, App.state.turn));
+      } catch (e) {
+        res = { ok: false, error: String(e && e.message) };
+      }
+      if (!res.ok) {
+        // never leave the table stuck: play something legal for this phase
+        for (var tries = 0; tries < 4 && !res.ok; tries++) {
+          try { res = SSP.act(App.state, cur.id, safeAction(App.state)); } catch (e2) { break; }
+        }
+      }
       afterChange();
     }, typeof window.TF_BOT_DELAY === 'number' ? window.TF_BOT_DELAY : (620 + Math.random() * 420));
+
+    // Backstop: if the game has not moved on at all after five seconds, offer a
+    // button. Judged on the state version, so a bot failing repeatedly still counts.
+    clearTimeout(App.stallTimer);
+    var mark = App.state.version;
+    App.stallTimer = setTimeout(function () {
+      if (!App.state || App.state.version !== mark) return;
+      if (!App.state.players[App.state.turn] || !App.state.players[App.state.turn].bot) return;
+      App.stalled = true;
+      if (App.view) renderGame();
+    }, 5000);
   }
 
   function autoPlayStuckSeat() {
     if (!App.state) return;
-    var idx = App.state.turn;
-    var p = App.state.players[idx];
-    var res = SSP.act(App.state, p.id, BOT.decide(App.state, idx));
-    if (!res.ok) SSP.act(App.state, p.id, { type: 'endTurn' });
+    var p = App.state.players[App.state.turn];
+    var res;
+    try { res = SSP.act(App.state, p.id, BOT.decide(App.state, App.state.turn)); }
+    catch (e) { res = { ok: false }; }
+    for (var tries = 0; tries < 6 && !res.ok; tries++) {
+      try { res = SSP.act(App.state, p.id, safeAction(App.state)); } catch (e2) { break; }
+    }
+    App.stalled = false;
     afterChange();
   }
 
@@ -3754,8 +3831,15 @@ input.code { font-family: var(--mono); text-transform: uppercase; letter-spacing
     if (!V.yourTurn) {
       var cur = V.players.filter(function (p) { return p.id === V.turnId; })[0];
       hint.textContent = 'Waiting for ' + (cur ? cur.name : 'the next player') + '.';
-      if ((App.mode === 'host' || App.mode === 'solo') && cur && !cur.connected && !cur.bot) {
-        add('Play this turn for ' + cur.name, '', autoPlayStuckSeat);
+      // A seat can stall for two reasons: a person who has dropped out, or a bot
+      // whose turn did not fire. Either way the host gets a way to move things on.
+      if (App.mode === 'host' || App.mode === 'solo') {
+        if (cur && !cur.connected && !cur.bot) {
+          add('Play this turn for ' + cur.name, '', autoPlayStuckSeat);
+        } else if (cur && cur.bot && App.stalled) {
+          hint.textContent = (cur.name || 'That bot') + ' seems stuck. Nudge them on.';
+          add('Play ' + cur.name + '\u2019s turn', 'primary', autoPlayStuckSeat);
+        }
       }
       return;
     }
@@ -4245,7 +4329,7 @@ input.code { font-family: var(--mono); text-transform: uppercase; letter-spacing
     var count = $('board-count');
     if (count) {
       var n = data.totalGames || 0;
-      count.innerHTML = '<b>' + n.toLocaleString() + '</b> ' +
+      count.innerHTML = '<b>' + n.toLocaleString() + '</b>' +
         (n === 1 ? 'game played here' : 'games played here');
     }
 
@@ -4484,6 +4568,10 @@ input.code { font-family: var(--mono); text-transform: uppercase; letter-spacing
     }
 
     renderToggles();
+
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden && (App.mode === 'host' || App.mode === 'solo') && App.state) scheduleBot();
+    });
 
     window.addEventListener('beforeunload', function (e) {
       if (App.mode === 'host' && App.started) { e.preventDefault(); e.returnValue = ''; }
