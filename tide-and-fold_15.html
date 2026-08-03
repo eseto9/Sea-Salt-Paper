@@ -1,0 +1,4617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#06171f">
+<title>Tide &amp; Fold — a paper sea card game</title>
+<meta name="description" content="A free browser card game for 2–4 friends on separate devices. One player hosts, the rest join with a four-letter code.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%2306171f'/%3E%3Cpath d='M6 40h52l-10 16H16z' fill='%23f0c15a'/%3E%3Cpath d='M32 8v32M34 12l20 28H34z' stroke='%233ea9e8' stroke-width='4' fill='%233ea9e8'/%3E%3C/svg%3E">
+<style>/* ============================================================
+   Tide & Fold — cut paper under lamplight
+   ============================================================ */
+
+:root {
+  --abyss: #06171f;
+  --deep: #0c2531;
+  --shoal: #123443;
+  --edge: #1e4c5f;
+  --foam: #eaf4f2;
+  --mist: #8fb0b8;
+  --sand: #f0c15a;
+  --alarm: #ff4d3d;
+  --grow: #35c08a;
+
+  /* the eleven printed card colours */
+  --darkblue: #21406e;
+  --lightblue: #4bb0e8;
+  --darkgrey: #3c4552;
+  --yellow: #efb324;
+  --green: #2fa46f;
+  --mauve: #9b8ad4;
+  --lightgrey: #b9c3cc;
+  --fadedorange: #e8a06a;
+  --pink: #e58fb0;
+  --orange: #e8763a;
+  --white: #f4f1e8;
+
+  --r: 14px;
+  --gap: 10px;
+  --shadow: 0 10px 26px -14px rgba(0, 0, 0, .95);
+
+  --display: 'Bricolage Grotesque', 'Trebuchet MS', system-ui, sans-serif;
+  --body: 'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  font-family: var(--body);
+  color: var(--foam);
+  background:
+    radial-gradient(120% 80% at 50% -10%, #12455a 0%, transparent 60%),
+    radial-gradient(90% 60% at 100% 100%, #0d3141 0%, transparent 55%),
+    var(--abyss);
+  background-attachment: fixed;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior-y: none;
+}
+
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--sand); outline-offset: 2px; border-radius: 6px; }
+
+.hidden { display: none !important; }
+
+/* ---------- the fold: shared paper treatment ---------- */
+.paper {
+  position: relative;
+  background: var(--deep);
+  border: 1px solid var(--edge);
+  border-radius: var(--r);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.paper::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(146deg, rgba(255, 255, 255, .07) 0 42%, rgba(0, 0, 0, .16) 42.4% 100%);
+  pointer-events: none;
+}
+
+/* ---------- shell ---------- */
+.wrap { max-width: 980px; margin: 0 auto; padding: 12px 12px 28px; }
+
+.masthead { display: flex; align-items: baseline; gap: 10px; padding: 10px 4px 14px; }
+.masthead h1 {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: clamp(22px, 5.4vw, 34px);
+  letter-spacing: -.03em;
+  margin: 0;
+  line-height: .95;
+}
+.masthead h1 em { font-style: normal; color: var(--sand); }
+.masthead .tag { font-size: 12px; color: var(--mist); letter-spacing: .14em; text-transform: uppercase; }
+
+/* During play the title steps aside so the board, controls and hand share one screen. */
+body.in-game .masthead { display: none; }
+body.in-game .opp .backs { display: none; }
+body.in-game .opp { padding: 7px 9px; }
+body.in-game .opp .meta { margin-top: 1px; font-size: 11.5px; }
+body.in-game .tide { padding: 6px 11px; }
+body.in-game .table { padding: 10px 10px; }
+body.in-game .hand { padding: 7px 2px 3px; }
+body.in-game .sectionhead { margin-bottom: 3px; }
+body.in-game .banner { margin-bottom: 6px; }
+body.in-game .rail { margin-bottom: 6px; }
+body.in-game .opp .pairstrip { margin-top: 6px; gap: 4px; }
+body.in-game .opp .pairstrip .card.small { width: 40px; height: 56px; }
+body.in-game .opp .pairstrip .card.small svg { width: 24px; height: 24px; }
+body.in-game .opp .pairstrip .card.small .name { display: none; }
+body.in-game #mypairs .card.small { width: 42px; height: 58px; }
+body.in-game #mypairs .card.small svg { width: 25px; height: 25px; }
+body.in-game #mypairs .card.small .name { display: none; }
+
+/* ---------- lobby ---------- */
+.panel { padding: 18px; margin-bottom: 14px; }
+.panel h2 {
+  font-family: var(--display); font-weight: 700; letter-spacing: -.02em;
+  font-size: 18px; margin: 0 0 4px;
+}
+.panel p.sub { margin: 0 0 14px; color: var(--mist); font-size: 14px; line-height: 1.5; }
+
+label.field { display: block; margin-bottom: 12px; }
+label.field span {
+  display: block; font-size: 11px; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--mist); margin-bottom: 6px;
+}
+input[type=text], select {
+  width: 100%; padding: 12px 14px; border-radius: 10px;
+  border: 1px solid var(--edge); background: #0a1f29; color: var(--foam);
+  font-family: var(--body); font-size: 16px;
+}
+input.code { font-family: var(--mono); text-transform: uppercase; letter-spacing: .34em; font-size: 20px; }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 12px 18px; border-radius: 10px; border: 1px solid var(--edge);
+  background: var(--shoal); font-weight: 600; cursor: pointer;
+  transition: transform .08s ease, background .15s ease, border-color .15s ease;
+  min-height: 44px;
+}
+.btn:hover:not(:disabled) { background: #1a4557; }
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:disabled { opacity: .38; cursor: not-allowed; }
+.btn.primary { background: var(--sand); color: #21160a; border-color: #b98f2d; }
+.btn.primary:hover:not(:disabled) { background: #ffd571; }
+.btn.danger { background: var(--alarm); color: #2a0b07; border-color: #b93325; }
+.btn.danger:hover:not(:disabled) { background: #ff6b5c; }
+.btn.ghost { background: transparent; }
+.btn.small { padding: 7px 12px; min-height: 34px; font-size: 13px; }
+.btn.wide { width: 100%; }
+
+.row { display: flex; gap: 10px; flex-wrap: wrap; }
+.row > * { flex: 1 1 160px; }
+
+.roomcode {
+  font-family: var(--mono); font-size: clamp(30px, 9vw, 46px); letter-spacing: .18em;
+  color: var(--sand); font-weight: 700; text-align: center; padding: 10px 0 4px;
+}
+.copyline { text-align: center; color: var(--mist); font-size: 13px; margin-bottom: 12px; }
+
+.seat {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+  border: 1px solid var(--edge); border-radius: 10px; margin-bottom: 8px; background: #0a1f29;
+}
+.seat .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--grow); flex: none; }
+.seat .dot.off { background: #56707a; }
+.seat b { font-weight: 600; }
+.seat .role { margin-left: auto; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--mist); }
+
+.notice {
+  border-left: 3px solid var(--sand); background: rgba(240, 193, 90, .09);
+  padding: 10px 12px; border-radius: 0 8px 8px 0; font-size: 13.5px; line-height: 1.5; color: #f4e3bd;
+  margin-bottom: 12px;
+}
+.notice.bad { border-color: var(--alarm); background: rgba(255, 77, 61, .1); color: #ffd6d0; }
+
+/* ---------- leaderboard ---------- */
+.bigcount {
+  text-align: center; color: var(--mist); font-size: 12px;
+  letter-spacing: .14em; text-transform: uppercase; margin: 2px 0 14px; line-height: 1.5;
+}
+.bigcount b {
+  display: block; color: var(--sand); font-family: var(--mono); font-weight: 700;
+  font-size: clamp(38px, 11vw, 56px); letter-spacing: -.02em; text-transform: none;
+}
+.boardnote { color: var(--mist); font-size: 13.5px; line-height: 1.5; padding: 4px 0; }
+.boardrow {
+  display: flex; align-items: baseline; gap: 10px; padding: 7px 10px;
+  border-radius: 9px; font-size: 14px;
+}
+.boardrow:nth-child(odd) { background: rgba(255, 255, 255, .04); }
+.boardrow .rank { font-family: var(--mono); color: var(--mist); width: 22px; flex: none; }
+.boardrow .who { flex: 1 1 auto; font-weight: 600; }
+.boardrow .who .tag {
+  font-style: normal; font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--mist); border: 1px solid var(--edge); border-radius: 20px; padding: 1px 6px; margin-left: 5px;
+}
+.boardrow .rating { font-family: var(--mono); font-weight: 700; color: var(--sand); }
+.boardrow .rating .prov { font-style: normal; color: var(--mist); font-size: 11px; margin-left: 1px; }
+.boardrow .rec { font-family: var(--mono); font-size: 12px; color: var(--mist); width: 46px; text-align: right; }
+.boardrow.isbot .who { font-weight: 500; color: #b9cdd4; }
+
+.ratingline {
+  display: flex; align-items: center; gap: 6px; margin-top: 6px;
+  font-size: 12.5px; color: var(--mist);
+}
+.ratingline b { font-family: var(--mono); color: var(--foam); }
+.ratingline .up { color: var(--grow); font-family: var(--mono); font-weight: 700; }
+.ratingline .down { color: var(--alarm); font-family: var(--mono); font-weight: 700; }
+
+/* ---------- house rules ---------- */
+.presets { display: flex; gap: 8px; flex-wrap: wrap; }
+.presets .btn { flex: 1 1 auto; }
+
+.toggles { margin-top: 12px; display: grid; gap: 8px; }
+.toggle {
+  display: flex; align-items: flex-start; gap: 11px; width: 100%; text-align: left;
+  padding: 11px 12px; border-radius: 11px; cursor: pointer;
+  border: 1px solid var(--edge); background: #0a1f29; color: var(--foam);
+  font: inherit; transition: border-color .15s ease, background .15s ease;
+}
+.toggle:hover { border-color: #2f6d85; }
+.toggle .box {
+  flex: none; width: 22px; height: 22px; border-radius: 6px; margin-top: 1px;
+  border: 1px solid #2f6d85; background: #0d2b38; position: relative;
+}
+.toggle .box::after {
+  content: ''; position: absolute; inset: 4px; border-radius: 2px; background: transparent;
+  transition: background .15s ease;
+}
+.toggle[aria-pressed=true] { border-color: var(--sand); background: rgba(240, 193, 90, .09); }
+.toggle[aria-pressed=true] .box { border-color: var(--sand); }
+.toggle[aria-pressed=true] .box::after { background: var(--sand); }
+.toggle b { display: block; font-weight: 600; font-size: 14.5px; }
+.toggle .txt > span { display: block; font-size: 12.5px; color: var(--mist); line-height: 1.45; margin-top: 2px; }
+
+.tideopts { display: grid; gap: 5px; margin: 3px 0 4px 33px; }
+.tideopt {
+  display: flex; align-items: flex-start; gap: 9px; width: 100%; text-align: left;
+  padding: 8px 10px; border-radius: 9px; cursor: pointer; font: inherit;
+  border: 1px solid var(--edge); background: #0a1f29; color: var(--foam);
+  transition: border-color .15s ease, background .15s ease;
+}
+.tideopt:hover { border-color: #2f6d85; }
+.tideopt .dot {
+  flex: none; width: 14px; height: 14px; border-radius: 50%; margin-top: 3px;
+  border: 1px solid #2f6d85; background: #0d2b38; position: relative;
+}
+.tideopt[aria-checked=true] { border-color: var(--sand); background: rgba(240, 193, 90, .09); }
+.tideopt[aria-checked=true] .dot { border-color: var(--sand); }
+.tideopt[aria-checked=true] .dot::after {
+  content: ''; position: absolute; inset: 3px; border-radius: 50%; background: var(--sand);
+}
+.tideopt b { display: block; font-weight: 600; font-size: 13.5px; }
+.tideopt .txt > span { display: block; font-size: 12px; color: var(--mist); line-height: 1.4; margin-top: 1px; }
+
+.ruleslist { display: grid; gap: 6px; }
+.ruleslist div { font-size: 13.5px; color: #c3d8dd; display: flex; gap: 8px; }
+.ruleslist div b { color: var(--foam); font-weight: 600; }
+.ruleslist div.off { color: #6b8b95; }
+
+/* ---------- tide strip ---------- */
+.tide {
+  display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap;
+  padding: 7px 12px; border-radius: 12px; margin-bottom: 6px;
+  background: linear-gradient(100deg, rgba(62, 169, 232, .18), rgba(62, 169, 232, .04));
+  border: 1px solid rgba(62, 169, 232, .4);
+}
+.tide b {
+  font-family: var(--display); font-weight: 700; letter-spacing: -.01em;
+  font-size: 15px; color: #9fd8ff;
+}
+.tide span { font-size: 12.5px; color: #b9d6e2; }
+.tide .chip {
+  font-size: 9.5px; letter-spacing: .16em; text-transform: uppercase;
+  color: #7fbfe6; border: 1px solid rgba(62, 169, 232, .5); border-radius: 20px; padding: 2px 7px;
+}
+
+/* ---------- status rail ---------- */
+.rail {
+  display: flex; align-items: stretch; gap: 8px; margin-bottom: 8px;
+  overflow-x: auto; scrollbar-width: none; padding-bottom: 2px;
+}
+.rail::-webkit-scrollbar { display: none; }
+.stat {
+  flex: none; padding: 8px 12px; border-radius: 10px; background: var(--deep);
+  border: 1px solid var(--edge); min-width: 74px;
+}
+.stat i { font-style: normal; display: block; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--mist); }
+.stat b { font-family: var(--mono); font-size: 17px; font-weight: 700; }
+.stat.hot b { color: var(--sand); }
+
+/* ---------- turn banner ---------- */
+.banner {
+  display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-radius: 12px;
+  background: linear-gradient(100deg, rgba(240, 193, 90, .16), rgba(240, 193, 90, .04));
+  border: 1px solid rgba(240, 193, 90, .38); margin-bottom: 8px; font-size: 14.5px;
+}
+.banner.waiting { background: rgba(255, 255, 255, .03); border-color: var(--edge); color: var(--mist); }
+.banner.alarm {
+  background: linear-gradient(100deg, rgba(255, 77, 61, .22), rgba(255, 77, 61, .05));
+  border-color: rgba(255, 77, 61, .55); color: #ffd9d4;
+}
+.banner .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--sand); flex: none; animation: pulse 1.6s infinite; }
+.banner.alarm .pulse { background: var(--alarm); }
+@keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.7); } }
+
+/* ---------- opponents ---------- */
+.opps { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin-bottom: 10px; }
+.opp { padding: 10px 11px; border-radius: 12px; background: var(--deep); border: 1px solid var(--edge); }
+.opp.active { border-color: var(--sand); box-shadow: 0 0 0 1px rgba(240, 193, 90, .35); }
+.opp.gone { opacity: .5; }
+.opp .head { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; }
+.opp .head .score { margin-left: auto; font-family: var(--mono); color: var(--sand); font-size: 13px; }
+.opp .meta { font-size: 11.5px; color: var(--mist); margin-top: 2px; letter-spacing: .02em; }
+.opp .backs { display: flex; gap: 2px; margin-top: 7px; flex-wrap: wrap; }
+.opp .back {
+  width: 13px; height: 19px; border-radius: 3px; flex: none;
+  background: repeating-linear-gradient(135deg, #1b4d61 0 3px, #143b4b 3px 6px);
+  border: 1px solid #2a6d85;
+}
+.opp .pairstrip {
+  display: flex; gap: 3px; margin-top: 7px; flex-wrap: nowrap;
+  overflow-x: auto; scrollbar-width: none; padding-bottom: 1px;
+}
+.opp .pairstrip::-webkit-scrollbar { display: none; }
+.opp .pairstrip .card.faceup { box-shadow: 0 0 0 1.5px rgba(255, 255, 255, .5); }
+.opp .pairstrip .divider {
+  width: 1px; align-self: stretch; background: var(--edge); margin: 0 3px; flex: none;
+}
+
+/* ---------- table ---------- */
+.table {
+  display: block; padding: 12px 10px; border-radius: 16px; margin-bottom: 10px;
+  background: rgba(255, 255, 255, .028); border: 1px solid rgba(255, 255, 255, .07);
+}
+.tablerow { display: flex; gap: 12px; justify-content: center; align-items: flex-start; }
+.slot { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 6px; border-radius: 12px; }
+.slot.target { outline: 2px dashed rgba(240, 193, 90, .8); outline-offset: 2px; background: rgba(240, 193, 90, .07); }
+.slot.spent { opacity: .4; }
+.slot.target .cap { color: var(--sand); }
+.slot .drop { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--sand); }
+.slot .cap { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--mist); }
+.slot .cap b { color: var(--foam); font-family: var(--mono); }
+
+.deckback {
+  width: 84px; height: 118px; border-radius: 10px; position: relative; overflow: hidden;
+  background: linear-gradient(160deg, #17495d, #0d2c3a);
+  border: 1px solid #276b83; box-shadow: var(--shadow);
+}
+.deckback::before {
+  content: ''; position: absolute; inset: -20%;
+  background:
+    repeating-linear-gradient(35deg, rgba(255, 255, 255, .09) 0 2px, transparent 2px 11px),
+    repeating-linear-gradient(-35deg, rgba(255, 255, 255, .06) 0 2px, transparent 2px 11px);
+}
+.deckback::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(146deg, rgba(255, 255, 255, .1) 0 42%, rgba(0, 0, 0, .22) 42.4% 100%);
+}
+.deckback.empty { opacity: .3; }
+
+.pileslot { position: relative; }
+.emptypile {
+  width: 84px; height: 118px; border-radius: 10px;
+  border: 1px dashed #2c5f74; display: grid; place-items: center;
+  color: #4d7484; font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+}
+
+/* ---------- what just happened to a pile ---------- */
+.slot.moved { position: relative; }
+.slot.moved.placed { outline: 2px solid var(--green); outline-offset: 3px; border-radius: 12px; }
+.slot.moved.taken { outline: 2px dashed var(--orange); outline-offset: 3px; border-radius: 12px; }
+.slot.moved .card, .slot.moved .emptypile { animation: landed .5s ease; }
+@keyframes landed {
+  0% { transform: translateY(-16px) scale(.94); opacity: .2; }
+  100% { transform: none; opacity: 1; }
+}
+.movetag {
+  position: absolute; left: 50%; top: -10px; transform: translateX(-50%);
+  font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase;
+  padding: 2px 7px; border-radius: 20px; white-space: nowrap; z-index: 3;
+  color: #06171f; font-weight: 700;
+}
+.movetag.placed { background: var(--green); }
+.movetag.taken { background: var(--orange); }
+.card.takenghost {
+  position: absolute; left: 6px; top: 6px; z-index: 2; pointer-events: none;
+  opacity: .55; animation: liftaway 2.4s ease forwards;
+}
+@keyframes liftaway {
+  0% { transform: translateY(0) scale(1); opacity: .75; }
+  70% { transform: translateY(-26px) scale(.92); opacity: .35; }
+  100% { transform: translateY(-34px) scale(.9); opacity: 0; }
+}
+
+/* ---------- inline trays ---------- */
+.tray, .crabtray {
+  margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--edge);
+}
+.traylab {
+  font-size: 11px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--sand); text-align: center; margin-bottom: 9px;
+}
+.traylab.calm { color: var(--mist); }
+.traynote { font-size: 12px; color: var(--mist); text-align: center; margin: -4px 0 4px; }
+.traycards { display: flex; gap: 12px; justify-content: center; }
+.pilelab {
+  font-size: 11px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--mist); margin: 10px 0 6px;
+}
+.crabtray .strip { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; }
+
+/* ---------- a duo has been played ---------- */
+.pairfx {
+  position: fixed; left: 50%; top: 22%; z-index: 88; pointer-events: none;
+  transform: translate(-50%, 8px) scale(.94); opacity: 0;
+  transition: transform .3s cubic-bezier(.2,.8,.3,1), opacity .3s ease;
+  display: flex; align-items: center; gap: 13px;
+  padding: 12px 17px; border-radius: 14px; max-width: min(420px, 92vw);
+  background: rgba(11, 40, 52, .96); border: 1px solid var(--sand);
+  box-shadow: 0 26px 50px -22px #000;
+}
+.pairfx.in { transform: translate(-50%, 0) scale(1); opacity: 1; }
+.pairfx.out { transform: translate(-50%, -10px) scale(.97); opacity: 0; }
+.pairfx .cards { display: flex; gap: 4px; flex: none; }
+.pairfx .say b {
+  display: block; font-family: var(--display); font-weight: 700;
+  font-size: 15px; color: var(--sand); letter-spacing: -.01em;
+}
+.pairfx .say span { display: block; font-size: 12.5px; color: #c8dee4; line-height: 1.4; margin-top: 2px; }
+
+@keyframes pulsefx {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(240, 193, 90, 0); }
+  35% { box-shadow: 0 0 0 3px rgba(240, 193, 90, .75); }
+}
+.pulsefx { animation: pulsefx .85s ease; }
+
+/* ---------- the steal ---------- */
+.stealtray { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--edge); }
+.stealrow { margin-bottom: 14px; }
+.stealrow:last-child { margin-bottom: 2px; }
+.stealrow .who {
+  font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--mist); margin-bottom: 7px;
+}
+.fan { display: flex; gap: 9px; flex-wrap: wrap; }
+
+/* These are the one thing you have to tap accurately, so they are sized for a thumb. */
+.cardback {
+  width: 58px; height: 82px; border-radius: 8px; padding: 0; flex: none; cursor: pointer;
+  border: 1px solid #2a6d85; position: relative; overflow: hidden;
+  background: linear-gradient(160deg, #17495d, #0d2c3a);
+  box-shadow: var(--shadow);
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+.cardback::before {
+  content: ''; position: absolute; inset: -25%;
+  background:
+    repeating-linear-gradient(35deg, rgba(255, 255, 255, .1) 0 2px, transparent 2px 11px),
+    repeating-linear-gradient(-35deg, rgba(255, 255, 255, .06) 0 2px, transparent 2px 11px);
+}
+.cardback::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(146deg, rgba(255, 255, 255, .1) 0 42%, rgba(0, 0, 0, .2) 42.4% 100%);
+}
+.cardback .num {
+  position: absolute; bottom: 4px; right: 7px; z-index: 2;
+  font-family: var(--mono); font-size: 11px; color: rgba(234, 244, 242, .55);
+}
+.cardback:hover, .cardback:focus-visible {
+  transform: translateY(-10px);
+  box-shadow: 0 0 0 2px var(--sand), 0 16px 26px -14px #000;
+}
+.cardback:active { transform: translateY(-4px); }
+
+.flying {
+  position: fixed !important; left: 0; top: 0; margin: 0; z-index: 90;
+  pointer-events: none; will-change: transform, opacity;
+  box-shadow: 0 24px 44px -18px #000;
+}
+
+/* ---------- cards ---------- */
+.card {
+  --card-bg: #1b3a49;
+  --card-ink: #f4faf9;
+  position: relative; width: 84px; height: 118px; flex: none;
+  border-radius: 10px; padding: 6px 6px 5px;
+  background: var(--card-bg); color: var(--card-ink);
+  border: 1px solid rgba(0, 0, 0, .35);
+  box-shadow: var(--shadow);
+  display: flex; flex-direction: column; align-items: center;
+  cursor: default; user-select: none;
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+.card::after {
+  content: ''; position: absolute; inset: 0; border-radius: 10px; pointer-events: none;
+  background: linear-gradient(146deg, rgba(255, 255, 255, .16) 0 42%, rgba(0, 0, 0, .14) 42.4% 100%);
+}
+.card .name {
+  font-family: var(--display); font-weight: 700; font-size: 10.5px;
+  letter-spacing: .04em; text-transform: uppercase; opacity: .92; line-height: 1;
+  align-self: flex-start;
+}
+.card svg { width: 46px; height: 46px; margin: auto 0 2px; display: block; }
+.card .foot {
+  font-family: var(--mono); font-size: 8.5px; line-height: 1.25; text-align: center;
+  opacity: .82; letter-spacing: -.01em; width: 100%; margin-top: auto;
+}
+.card .foot.duo { font-family: var(--body); font-size: 9px; opacity: .8; }
+.card .foot .win { color: inherit; font-weight: 700; letter-spacing: .04em; }
+.card .swatch {
+  position: absolute; top: 6px; right: 6px; width: 9px; height: 9px; border-radius: 2px;
+  border: 1px solid rgba(0, 0, 0, .35); z-index: 2;
+}
+
+.card[data-color=darkblue]    { --card-bg: #21406e; --card-ink: #dfeaff; }
+.card[data-color=lightblue]   { --card-bg: #4bb0e8; --card-ink: #05202e; }
+.card[data-color=darkgrey]    { --card-bg: #3c4552; --card-ink: #eceef2; }
+.card[data-color=yellow]      { --card-bg: #efb324; --card-ink: #2b1d02; }
+.card[data-color=green]       { --card-bg: #2fa46f; --card-ink: #042315; }
+.card[data-color=mauve]       { --card-bg: #9b8ad4; --card-ink: #1b1230; }
+.card[data-color=lightgrey]   { --card-bg: #b9c3cc; --card-ink: #1b232b; }
+.card[data-color=fadedorange] { --card-bg: #e8a06a; --card-ink: #2e1706; }
+.card[data-color=pink]        { --card-bg: #e58fb0; --card-ink: #2e0f1c; }
+.card[data-color=orange]      { --card-bg: #e8763a; --card-ink: #2c0f03; }
+.card[data-color=white]       { --card-bg: #f4f1e8; --card-ink: #1d2228; }
+
+.card.pick { cursor: pointer; }
+.card.pick:hover { transform: translateY(-8px); box-shadow: 0 18px 30px -16px #000; }
+.card.sel { transform: translateY(-12px); box-shadow: 0 0 0 3px var(--sand), 0 18px 30px -16px #000; }
+.card.dim { opacity: .45; }
+
+.card.mini { width: 34px; height: 48px; padding: 3px; border-radius: 5px; }
+.card.mini .name, .card.mini .foot, .card.mini .swatch { display: none; }
+.card.mini svg { width: 24px; height: 24px; margin: auto; }
+.card.mini::after { border-radius: 5px; }
+
+/* Big enough to read a rival's table at a glance. */
+.card.small { width: 46px; height: 64px; padding: 4px; border-radius: 7px; }
+.card.small .foot { display: none; }
+.card.small .name { font-size: 8px; letter-spacing: .02em; }
+.card.small .swatch { width: 7px; height: 7px; top: 4px; right: 4px; }
+.card.small svg { width: 28px; height: 28px; margin: auto 0 1px; }
+.card.small::after { border-radius: 7px; }
+
+/* Eligible duo partners lift; everything else steps back. */
+.card.live {
+  box-shadow: 0 0 0 2px var(--sand), 0 12px 22px -14px #000;
+  transform: translateY(-5px);
+}
+.card.faded { opacity: .42; filter: saturate(.55); }
+.card.faded:hover { opacity: .7; }
+
+/* ---------- hand ---------- */
+.mine { margin-bottom: 12px; }
+.sectionhead {
+  display: flex; align-items: center; gap: 8px; margin: 0 2px 5px;
+  font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--mist);
+}
+.sectionhead .pts { margin-left: auto; font-family: var(--mono); color: var(--sand); letter-spacing: 0; font-size: 13px; }
+
+.hand {
+  display: flex; gap: 7px; overflow-x: auto; padding: 10px 2px 4px;
+  scrollbar-width: thin;
+}
+.hand:empty::before { content: 'No cards yet'; color: #4d7484; font-size: 13px; padding: 40px 0; }
+
+.pairs {
+  display: flex; gap: 10px; flex-wrap: nowrap; padding: 2px 0 4px;
+  overflow-x: auto; scrollbar-width: thin;
+}
+.pairgrp { display: flex; gap: 2px; padding: 4px; border-radius: 8px; background: rgba(255, 255, 255, .05); border: 1px solid var(--edge); }
+.pairgrp.small { gap: 3px; padding: 3px; }
+
+/* ---------- controls ---------- */
+.controls {
+  padding: 11px 12px; border-radius: 12px; margin-bottom: 8px;
+  background: rgba(255, 255, 255, .05); border: 1px solid var(--edge);
+}
+.controls .inner { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.controls .hint { flex: 1 1 100%; font-size: 12.5px; color: var(--mist); margin-bottom: 3px; line-height: 1.45; }
+.controls .btn { flex: 1 1 auto; min-width: 130px; }
+
+/* ---------- overlay ---------- */
+.overlay {
+  position: fixed; inset: 0; z-index: 60; display: grid; place-items: center;
+  background: rgba(3, 12, 17, .82); backdrop-filter: blur(6px); padding: 14px;
+  animation: fade .18s ease;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+@keyframes fade { from { opacity: 0; } }
+.sheet {
+  width: min(680px, 100%); max-height: 90vh; max-height: 88dvh; overflow: auto;
+  background: var(--deep); border: 1px solid var(--edge); border-radius: 16px; padding: 18px;
+  box-shadow: 0 30px 70px -30px #000;
+}
+
+/* The scoring sheet keeps its heading and its button in view; only the scores scroll. */
+.sheet.pinned {
+  display: flex; flex-direction: column; overflow: hidden; padding: 0;
+  max-height: min(90vh, 900px);
+  max-height: min(100%, 900px);
+}
+.sheet.pinned .sheethead {
+  flex: none; padding: 16px 18px 10px;
+  border-bottom: 1px solid var(--edge); background: var(--deep);
+}
+.sheet.pinned .sheethead h3 { margin: 0; }
+.sheet.pinned .sheethead .sub { margin: 4px 0 0; }
+.sheet.pinned .sheetbody {
+  flex: 1 1 auto; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding: 12px 18px 4px; min-height: 0;
+}
+.sheet.pinned .sheetfoot {
+  flex: none; margin: 0; padding: 12px 18px calc(14px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--edge);
+  background: var(--deep);
+  position: sticky; bottom: 0; z-index: 2;
+}
+/* and the heading stays put at the other end */
+.sheet.pinned .sheethead { position: sticky; top: 0; z-index: 2; }
+.sheet h3 {
+  font-family: var(--display); font-weight: 800; letter-spacing: -.02em;
+  font-size: 21px; margin: 0 0 4px;
+}
+.sheet p.sub { margin: 0 0 14px; color: var(--mist); font-size: 14px; line-height: 1.5; }
+.sheet .cards { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin: 6px 0 14px; }
+
+.pilebox { margin-bottom: 12px; }
+.pilebox .lab { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--mist); margin-bottom: 6px; }
+.pilebox .strip { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; }
+
+/* ---------- scoreboard ---------- */
+.score { border: 1px solid var(--edge); border-radius: 12px; margin-bottom: 10px; overflow: hidden; }
+.score .top {
+  display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: rgba(255, 255, 255, .045);
+  font-weight: 600;
+}
+.score .top .n { font-family: var(--mono); margin-left: auto; font-size: 15px; }
+.score .top .n b { color: var(--sand); }
+.score.win .top { background: rgba(53, 192, 138, .16); }
+.score.lose .top { background: rgba(255, 77, 61, .12); }
+.score .lines { padding: 8px 12px 4px; font-size: 13px; }
+.score .entry { padding: 6px 0 8px; border-bottom: 1px solid rgba(255, 255, 255, .06); }
+.score .entry:last-child { border-bottom: 0; }
+.score .entry.muted { padding: 6px 12px 10px; }
+.score .entry .head { display: flex; gap: 8px; color: #c3d8dd; }
+.score .entry .head span:last-child {
+  margin-left: auto; font-family: var(--mono); font-weight: 700; color: var(--foam);
+}
+.score .entry.sting .head span:last-child { color: var(--alarm); }
+.score .entry.muted .head { color: #6b8b95; }
+.score .shots { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; margin-top: 6px; }
+.score .shots .arrow { color: var(--mist); font-size: 15px; margin: 0 2px; }
+.score .card.ghost { opacity: .5; }
+.badge {
+  display: inline-block; font-size: 10px; letter-spacing: .1em; text-transform: uppercase;
+  padding: 2px 7px; border-radius: 20px; border: 1px solid var(--edge); color: var(--mist);
+}
+.badge.hot { border-color: var(--sand); color: var(--sand); }
+
+/* ---------- session record ---------- */
+.record { margin: 6px 0 4px; border: 1px solid var(--edge); border-radius: 12px; overflow: hidden; }
+.reclab {
+  font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: var(--mist);
+  padding: 8px 12px 6px; background: rgba(255, 255, 255, .04);
+}
+.rectable { padding: 4px 12px 8px; }
+.recrow { display: flex; align-items: baseline; gap: 6px; padding: 4px 0; font-size: 13.5px; }
+.recrow span { flex: 1 1 auto; }
+.recrow b { font-family: var(--mono); font-size: 14px; color: var(--sand); }
+.recrow i { font-style: normal; font-size: 11px; color: var(--mist); margin-right: 6px; }
+.recrow.me span { font-weight: 700; }
+
+/* ---------- log ---------- */
+.logbox { margin-top: 6px; }
+.logbox .btn { letter-spacing: .1em; text-transform: uppercase; font-size: 11px; }
+.loglist {
+  margin-top: 8px;
+  max-height: 190px; overflow: auto; font-size: 12.5px; line-height: 1.55;
+  border: 1px solid var(--edge); border-radius: 10px; padding: 8px 11px; background: #08202b;
+}
+.loglist div { padding: 1px 0; color: #a9c4cb; }
+.loglist div.big { color: var(--sand); font-weight: 600; }
+.loglist div.pair { color: #b6e3ff; }
+.loglist div.win { color: var(--grow); font-weight: 700; }
+
+/* ---------- rules ---------- */
+.rules { font-size: 14px; line-height: 1.62; color: #cadde1; }
+.rules h4 {
+  font-family: var(--display); font-size: 15px; margin: 16px 0 5px; color: var(--foam);
+  letter-spacing: -.01em;
+}
+.rules ul { margin: 6px 0; padding-left: 18px; }
+.rules li { margin: 3px 0; }
+.rules code {
+  font-family: var(--mono); font-size: 12px; background: rgba(255, 255, 255, .07);
+  padding: 1px 5px; border-radius: 4px;
+}
+.chart { width: 100%; border-collapse: collapse; font-size: 13px; margin: 8px 0; }
+.chart th, .chart td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--edge); }
+.chart th { color: var(--mist); font-weight: 600; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; }
+.chart td.n { font-family: var(--mono); }
+
+/* ---------- a small celebration ---------- */
+.confetti { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+.confetti span {
+  position: absolute; top: -8vh; display: block;
+  animation-name: fall; animation-timing-function: linear; animation-iteration-count: 1;
+  animation-fill-mode: forwards;
+}
+.confetti .bit { border-radius: 2px; opacity: .95; }
+.confetti .bao { width: 34px; height: 34px; }
+.confetti span { will-change: transform; }
+.confetti .bao svg { width: 100%; height: 100%; display: block; }
+@keyframes fall {
+  0% { transform: translateY(0) rotate(0deg); opacity: 0; }
+  8% { opacity: 1; }
+  100% { transform: translateY(112vh) rotate(540deg); opacity: 1; }
+}
+
+.partycard {
+  position: relative; z-index: 2; text-align: center;
+  width: min(360px, 92vw); padding: 22px 20px 18px; border-radius: 18px;
+  background: var(--deep); border: 1px solid var(--sand);
+  box-shadow: 0 30px 70px -28px #000;
+  animation: pop .42s cubic-bezier(.2,.9,.3,1.2);
+}
+@keyframes pop {
+  from { transform: scale(.86) translateY(10px); opacity: 0; }
+  to { transform: scale(1) translateY(0); opacity: 1; }
+}
+.partycard .baobig { width: 82px; height: 82px; margin: 0 auto 8px; color: var(--pearl); }
+.partycard .baobig svg { width: 100%; height: 100%; display: block; }
+.partycard h3 {
+  font-family: var(--display); font-weight: 800; letter-spacing: -.02em;
+  font-size: 23px; margin: 0 0 5px; color: var(--sand);
+}
+.partycard p { margin: 0 0 15px; color: var(--mist); font-size: 14px; line-height: 1.5; }
+.btn.heart { font-size: 22px; line-height: 1; padding: 10px 18px; }
+
+/* ---------- a card taken from you ---------- */
+.lostcard {
+  position: fixed; left: 50%; top: 26%; z-index: 89; pointer-events: none;
+  transform: translate(-50%, 10px) scale(.9); opacity: 0;
+  transition: transform .3s cubic-bezier(.2,.8,.3,1), opacity .3s ease;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 13px 16px 15px; border-radius: 15px;
+  background: rgba(11, 40, 52, .97); border: 1px solid var(--alarm);
+  box-shadow: 0 26px 50px -22px #000;
+}
+.lostcard.in { transform: translate(-50%, 0) scale(1); opacity: 1; }
+.lostcard.out { transform: translate(-50%, -12px) scale(.97); opacity: 0; }
+.lostcard.storm { border-color: var(--azure); }
+.lostcard.storm .lab { color: #a7d9f7; }
+.lostcard .note { font-size: 11.5px; color: var(--mist); }
+.lostcard .lab {
+  font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: #ffb3aa;
+}
+
+/* ---------- toast ---------- */
+.toast {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: 24px; z-index: 95;
+  background: var(--alarm); color: #2a0b07; padding: 10px 16px; border-radius: 10px;
+  font-weight: 600; font-size: 14px; box-shadow: var(--shadow); max-width: 90vw; text-align: center;
+}
+.toast.info { background: var(--sand); color: #21160a; }
+
+/* ---------- small screens ---------- */
+/* On a phone the board, the controls and your hand should all sit on one screen,
+   so in-game chrome gets trimmed hard. */
+@media (max-width: 640px) {
+  .wrap { padding: 8px 8px 16px; }
+
+  .rail { margin-bottom: 8px; }
+  .stat { padding: 6px 10px; min-width: 62px; }
+  .stat b { font-size: 15px; }
+  .stat i { font-size: 9px; }
+
+  .banner { padding: 8px 11px; margin-bottom: 8px; font-size: 13.5px; }
+
+  .opps { grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+  .opp { padding: 7px 9px; }
+  .opp .backs { display: none; }
+  .opp .meta { margin-top: 1px; font-size: 11px; }
+  .opp .pairstrip { margin-top: 5px; gap: 2px; }
+  .opp .pairstrip .card.mini { width: 21px; height: 30px; }
+  .opp .pairstrip .card.mini svg { width: 14px; height: 14px; }
+
+  .card { width: 68px; height: 96px; }
+  .card svg { width: 36px; height: 36px; }
+  .card .name { font-size: 9px; }
+  .card .foot { font-size: 7.4px; }
+  .deckback, .emptypile { width: 68px; height: 96px; }
+
+  .table { padding: 10px 6px; margin-bottom: 8px; }
+  .tablerow { gap: 6px; }
+  .slot { padding: 4px; gap: 4px; }
+  .tray, .crabtray { margin-top: 10px; padding-top: 8px; }
+  .traylab { margin-bottom: 6px; }
+  .traycards { gap: 8px; }
+
+  .controls { padding: 8px 10px; margin-bottom: 8px; }
+  .controls .hint { font-size: 12px; margin-bottom: 2px; }
+  .controls .btn { min-width: 0; padding: 10px 12px; }
+
+  .tide { padding: 6px 10px; gap: 6px; margin-bottom: 6px; }
+  .tide b { font-size: 13.5px; }
+  .tide span { font-size: 11.5px; line-height: 1.35; }
+  .banner { margin-bottom: 6px; }
+  .traycards { gap: 7px; }
+  .cardback { width: 52px; height: 74px; }
+  .card.small { width: 40px; height: 56px; }
+  .card.small svg { width: 24px; height: 24px; }
+  .card.small .name { display: none; }
+  .opp .pairstrip { gap: 3px; }
+  .pairfx { top: auto; bottom: 14px; gap: 10px; padding: 10px 13px; }
+  .lostcard { top: 18%; padding: 10px 13px 12px; }
+  .sheet.pinned { max-height: 100%; }
+  .overlay { padding: 8px; }
+  .sheet.pinned .sheethead { padding: 13px 14px 9px; }
+  .sheet.pinned .sheethead h3 { font-size: 18px; }
+  .sheet.pinned .sheetbody { padding: 10px 14px 4px; }
+  .sheet.pinned .sheetfoot { padding: 10px 14px calc(12px + env(safe-area-inset-bottom)); }
+  .pairfx .say b { font-size: 14px; }
+  .pairfx .say span { font-size: 11.5px; }
+  .fan { gap: 8px; }
+  .tideopts { margin-left: 0; }
+  .stealrow { margin-bottom: 12px; }
+
+  .mine { margin-bottom: 6px; }
+  .sectionhead { margin-bottom: 4px; }
+  .pairs { padding: 0; }
+  .hand { padding: 9px 2px 6px; gap: 6px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <h1>Tide&nbsp;&amp;&nbsp;<em>Fold</em></h1>
+    <span class="tag">paper sea &middot; 2&ndash;4 players</span>
+  </header>
+
+  <!-- ================= MENU ================= -->
+  <section id="screen-menu">
+    <div class="panel paper">
+      <h2>Leaderboard</h2>
+      <div class="bigcount" id="board-count"></div>
+      <div class="row" style="margin-bottom:10px">
+        <button class="btn small" id="btn-board-all">Everyone</button>
+        <button class="btn small ghost" id="btn-board-humans">People only</button>
+      </div>
+      <div id="board-body"></div>
+    </div>
+
+    <div class="panel paper">
+      <h2>Sit down</h2>
+      <p class="sub">One player opens a table and reads out the four-letter code. Everyone else joins from their own phone or laptop.</p>
+      <label class="field"><span>Your name</span><input id="name" type="text" maxlength="16" placeholder="Caleb Wilson" autocomplete="nickname"></label>
+      <div class="row">
+        <button class="btn primary" id="btn-host">Open a table</button>
+        <button class="btn" id="btn-showjoin">Join a table</button>
+      </div>
+    </div>
+
+    <div class="panel paper">
+      <h2>Play on your own</h2>
+      <p class="sub">Practise against the house bots. Nothing is sent anywhere.</p>
+      <div class="row">
+        <label class="field" style="margin:0">
+          <span>Opponents</span>
+          <select id="botcount">
+            <option value="1">1 bot</option>
+            <option value="2" selected>2 bots</option>
+            <option value="3">3 bots</option>
+          </select>
+        </label>
+        <button class="btn primary" id="btn-solo" style="align-self:flex-end">Deal</button>
+      </div>
+    </div>
+
+    <div class="panel paper">
+      <h2>Never played?</h2>
+      <p class="sub">Collect sets, pair up duos for their effects, and stop the round while you are ahead.</p>
+      <button class="btn wide" id="btn-rules">Read how to play</button>
+    </div>
+  </section>
+
+  <!-- ================= JOIN ================= -->
+  <section id="screen-join" class="hidden">
+    <div class="panel paper">
+      <h2>Join a table</h2>
+      <p class="sub">Ask the host for the four-letter code on their screen.</p>
+      <div id="join-status" class="notice hidden"></div>
+      <label class="field"><span>Table code</span><input id="joincode" class="code" type="text" maxlength="4" placeholder="ABCD" autocomplete="off" autocapitalize="characters" spellcheck="false"></label>
+      <div class="row">
+        <button class="btn primary" id="btn-join">Join</button>
+        <button class="btn ghost" id="btn-backmenu">Back</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= LOBBY ================= -->
+  <section id="screen-lobby" class="hidden">
+    <div class="panel paper" id="lobby-tablepanel">
+      <h2>Table</h2>
+      <div id="lobby-status" class="notice hidden"></div>
+      <div class="roomcode" id="lobby-code">••••</div>
+      <div class="copyline">Read this code out, or send the link.</div>
+      <div class="row" id="lobby-hostbits">
+        <button class="btn" id="btn-copy">Copy invite</button>
+      </div>
+    </div>
+
+    <div class="panel paper">
+      <h2>Players</h2>
+      <p class="sub">Two to four. The host's browser runs the game, so the host should keep this tab open.</p>
+      <div id="lobby-seats"></div>
+      <div id="lobby-guestbits" class="notice hidden">Waiting for the host to deal.</div>
+      <div class="row" id="lobby-botbits" style="margin-top:10px">
+        <button class="btn small" id="btn-addbot">Add a bot</button>
+        <button class="btn ghost small" id="btn-dropbot">Remove bot</button>
+      </div>
+    </div>
+
+    <div class="panel paper">
+      <h2>House rules</h2>
+      <p class="sub" id="rules-sub">Everything is off by default. Turn things on and the whole table plays that way.</p>
+
+      <div id="lobby-hostbits2">
+        <div class="presets">
+          <button class="btn small" data-preset="standard">Standard</button>
+          <button class="btn small" data-preset="blitz">Blitz</button>
+          <button class="btn small" data-preset="everything">Everything on</button>
+        </div>
+
+        <div class="row" style="margin-top:12px">
+          <label class="field" style="margin:0"><span>Declare from</span><input id="cfg-threshold" type="text" inputmode="numeric" value="7"></label>
+          <label class="field" style="margin:0"><span>Game ends at</span><input id="cfg-target" type="text" inputmode="numeric" value="40"></label>
+        </div>
+
+        <div class="toggles" id="cfg-toggles"></div>
+
+        <div class="row" style="margin-top:14px">
+          <button class="btn primary" id="btn-start" disabled>Deal the first round</button>
+          <button class="btn ghost" id="btn-rules2">How to play</button>
+        </div>
+      </div>
+
+      <div id="lobby-rulesview" class="hidden"></div>
+
+      <div class="row" style="margin-top:10px">
+        <button class="btn ghost small" id="btn-leave">Leave table</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= GAME ================= -->
+  <section id="screen-game" class="hidden">
+    <div class="rail" id="rail"></div>
+    <div class="banner" id="banner"></div>
+    <div class="tide hidden" id="tide"></div>
+    <div class="opps" id="opps"></div>
+    <div class="table" id="table"></div>
+
+    <div class="controls" id="actionbar"><div class="inner" id="actions"></div></div>
+
+    <div class="mine">
+      <div class="sectionhead hidden" id="mypairs-head"><span>On your table</span></div>
+      <div class="pairs" id="mypairs"></div>
+      <div class="sectionhead"><span>Your hand</span><span class="pts" id="hand-pts"></span></div>
+      <div class="hand" id="hand"></div>
+    </div>
+
+    <div class="logbox" id="logbox">
+      <button class="btn ghost small" id="btn-log" aria-expanded="false">Show table log</button>
+      <div class="loglist hidden" id="loglist"></div>
+    </div>
+  </section>
+
+</div>
+
+<div class="overlay hidden" id="overlay"></div>
+<div class="overlay hidden" id="modal"></div>
+<div class="overlay hidden" id="party"></div>
+<div class="toast hidden" id="toast"></div>
+
+<script>/* ============================================================
+   Tide & Fold — rules engine
+   Pure game logic. No DOM, no network. Testable in node.
+   ============================================================ */
+(function (root, factory) {
+  var api = factory();
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  root.SSP = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+  'use strict';
+
+  /* ---------- card definitions ---------- */
+
+  var TYPE_ORDER = ['crab', 'boat', 'fish', 'swimmer', 'shark', 'shell', 'octopus', 'penguin', 'sailor',
+    'lighthouse', 'shoal', 'colony', 'captain', 'jellyfish', 'hurricane', 'mermaid'];
+
+  var CARD_TYPES = {
+    crab:    { kind: 'duo', name: 'Crab',    partner: 'crab',    effect: 'Take any card from one discard pile.' },
+    boat:    { kind: 'duo', name: 'Boat',    partner: 'boat',    effect: 'Take another turn straight away.' },
+    fish:    { kind: 'duo', name: 'Fish',    partner: 'fish',    effect: 'Draw the top card of the deck.' },
+    swimmer: { kind: 'duo', name: 'Swimmer', partner: 'shark',   effect: 'With a Shark: steal a random card.' },
+    shark:   { kind: 'duo', name: 'Shark',   partner: 'swimmer', effect: 'With a Swimmer: steal a random card.' },
+    shell:   { kind: 'collector', name: 'Shell',   chart: [0, 0, 2, 4, 6, 8, 10] },
+    octopus: { kind: 'collector', name: 'Octopus', chart: [0, 0, 3, 6, 9, 12] },
+    penguin: { kind: 'collector', name: 'Penguin', chart: [0, 1, 3, 5] },
+    sailor:  { kind: 'collector', name: 'Sailor',  chart: [0, 0, 5] },
+
+    // Multipliers: each is worth a fixed amount per card of one type you own,
+    // counting both your hand and the pairs on your table.
+    lighthouse: { kind: 'multiplier', name: 'Lighthouse',     per: 'boat',    rate: 1 },
+    shoal:      { kind: 'multiplier', name: 'Shoal of Fish',  per: 'fish',    rate: 1 },
+    colony:     { kind: 'multiplier', name: 'Penguin Colony', per: 'penguin', rate: 2 },
+    captain:    { kind: 'multiplier', name: 'Captain',        per: 'sailor',  rate: 3 },
+    // Optional suit. A full bloom cancels itself out, so three is the number to chase.
+    // Three ends the game on the spot, so the chart never needs a fourth entry.
+    jellyfish: { kind: 'collector', name: 'Jellyfish', plural: 'Jellyfish', optional: true, sweep: 3, chart: [0, -3, -6] },
+    // A single card. Playing it trades your whole hand and table with a rival,
+    // and costs you 5 points whether you play it or are caught holding it.
+    hurricane: { kind: 'hurricane', name: 'Hurricane', optional: true, penalty: -5 },
+    mermaid: { kind: 'mermaid', name: 'Mermaid', sweep: 4 }
+  };
+
+  // The printed deck, colour by colour. Card counts and colour spreads are fixed,
+  // so the deck is described rather than generated.
+  var DECK_SPEC = {
+    crab:       { darkblue: 2, lightblue: 2, darkgrey: 2, yellow: 2, green: 1 },
+    boat:       { darkblue: 2, lightblue: 2, darkgrey: 2, yellow: 2 },
+    fish:       { lightblue: 2, green: 2, darkblue: 1, darkgrey: 1, yellow: 1 },
+    swimmer:    { darkblue: 1, lightblue: 1, darkgrey: 1, yellow: 1, green: 1 },
+    shark:      { darkblue: 1, lightblue: 1, darkgrey: 1, yellow: 1, mauve: 1 },
+    shell:      { mauve: 2, darkblue: 1, lightblue: 1, darkgrey: 1, yellow: 1 },
+    octopus:    { lightgrey: 2, darkblue: 1, lightblue: 1, green: 1 },
+    penguin:    { fadedorange: 1, pink: 1, lightgrey: 1 },
+    sailor:     { pink: 1, orange: 1 },
+    lighthouse: { lightgrey: 1 },
+    shoal:      { mauve: 1 },
+    colony:     { fadedorange: 1 },
+    captain:    { fadedorange: 1 },
+    mermaid:    { white: 4 },
+
+    // house-rule cards, only dealt when their mode is on
+    jellyfish:  { mauve: 1, lightgrey: 1, green: 1 },
+    hurricane:  { darkgrey: 1 }
+  };
+
+  var COUNTS = {};
+  for (var _t in DECK_SPEC) {
+    COUNTS[_t] = 0;
+    for (var _c in DECK_SPEC[_t]) COUNTS[_t] += DECK_SPEC[_t][_c];
+  }
+
+  var COLORS = ['darkblue', 'lightblue', 'darkgrey', 'yellow', 'green', 'mauve',
+    'lightgrey', 'fadedorange', 'pink', 'orange', 'white'];
+
+  function typesInPlay(cfg) {
+    return TYPE_ORDER.filter(function (t) {
+      return !CARD_TYPES[t].optional || (cfg && cfg[t]);
+    });
+  }
+
+  function buildDeck(cfg) {
+    var deck = [], order = typesInPlay(cfg);
+    for (var t = 0; t < order.length; t++) {
+      var type = order[t], spec = DECK_SPEC[type], k = 0;
+      for (var color in spec) {
+        for (var n = 0; n < spec[color]; n++) {
+          deck.push({ id: type + '_' + k, type: type, color: color });
+          k++;
+        }
+      }
+    }
+    return deck;
+  }
+
+  function deckSize(cfg) { return buildDeck(cfg).length; }
+
+  /* ---------- storm season ---------- */
+
+  var TIDES = [
+    { key: 'highTide',   name: 'High Tide',   blurb: 'Mermaids score double their colour group.' },
+    { key: 'doldrums',   name: 'Doldrums',    blurb: 'Duo pairs are worth 2 each.' },
+    { key: 'deadCalm',   name: 'Dead Calm',   blurb: 'No Last Chance. Stop is the only way out.' },
+    { key: 'springTide', name: 'Spring Tide', blurb: 'The declare bar is 3 points higher.' },
+    { key: 'shallows',   name: 'Shallows',    blurb: 'The deck is 12 cards short.' },
+    { key: 'reef',       name: 'Reef',        blurb: 'Scoring your hand also pays a colour bonus.' },
+    { key: 'bloom',      name: 'Bloom',       blurb: 'Jellyfish sting nobody.', needsJellyfish: true }
+  ];
+
+  function tidePool(cfg) {
+    return TIDES.filter(function (t) { return !t.needsJellyfish || cfg.jellyfish; });
+  }
+
+  function tideByKey(cfg, key) {
+    var found = TIDES.filter(function (t) { return t.key === key; })[0];
+    if (!found) return null;
+    if (found.needsJellyfish && !cfg.jellyfish) return null;
+    return { key: found.key, name: found.name, blurb: found.blurb };
+  }
+
+  function pickTide(state) {
+    // A fixed tide runs every round; otherwise one is drawn, never the same twice running.
+    if (state.config.tideKey) {
+      var fixed = tideByKey(state.config, state.config.tideKey);
+      if (fixed) return fixed;
+    }
+    var pool = tidePool(state.config);
+    var last = state.tide ? state.tide.key : null;
+    var choices = pool.filter(function (t) { return t.key !== last; });
+    if (!choices.length) choices = pool;
+    var t = choices[Math.floor(Math.random() * choices.length)];
+    return { key: t.key, name: t.name, blurb: t.blurb };
+  }
+
+  var NO_MODS = {
+    mermaidMul: 1, pairValue: 1, jellyZero: false,
+    bonusForAll: false, noLastChance: false, thresholdBump: 0, deckTrim: 0
+  };
+
+  function modsOf(state) {
+    var k = state && state.tide ? state.tide.key : null;
+    if (!k) return NO_MODS;
+    return {
+      mermaidMul: k === 'highTide' ? 2 : 1,
+      pairValue: k === 'doldrums' ? 2 : 1,
+      jellyZero: k === 'bloom',
+      bonusForAll: k === 'reef',
+      noLastChance: k === 'deadCalm',
+      thresholdBump: k === 'springTide' ? 3 : 0,
+      deckTrim: k === 'shallows' ? 12 : 0
+    };
+  }
+
+  function threshold(state) {
+    return state.config.stopThreshold + modsOf(state).thresholdBump;
+  }
+
+  /* ---------- helpers ---------- */
+
+  function shuffle(a, rnd) {
+    rnd = rnd || Math.random;
+    for (var i = a.length - 1; i > 0; i--) {
+      var j = Math.floor(rnd() * (i + 1));
+      var t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+
+  function defaultConfig(n) {
+    return {
+      stopThreshold: n >= 4 ? 6 : 7,
+      targetScore: n <= 2 ? 40 : (n === 3 ? 35 : 30),
+      voidOnEmptyDeck: true,
+      pileCount: 2,
+      openSea: false,
+      jellyfish: false,
+      hurricane: false,
+      stormSeason: false,
+      tideKey: null,
+      tableLog: true
+    };
+  }
+
+  /* ---------- scoring ---------- */
+
+  // Counts every card the player owns: hand + cards in played duos.
+  function colorTally(p) {
+    var all = p.hand.slice().concat(p.hurricanes || []);
+    for (var i = 0; i < p.pairs.length; i++) all = all.concat(p.pairs[i].cards);
+    var counts = {};
+    for (var j = 0; j < all.length; j++) counts[all[j].color] = (counts[all[j].color] || 0) + 1;
+    var sorted = Object.keys(counts).map(function (c) { return { color: c, n: counts[c] }; });
+    sorted.sort(function (a, b) { return b.n - a.n || (a.color < b.color ? -1 : 1); });
+    return { counts: counts, sorted: sorted };
+  }
+
+  /* A Mermaid scores a colour group but is not part of the group it scores, so its
+     own card is deducted when it takes its own colour. Other Mermaids still count.
+     Which Mermaid takes which colour matters once that deduction exists, so the best
+     assignment is searched for rather than taken greedily — at most four Mermaids
+     across seven colours, so the search is tiny. */
+  function mermaidAwards(mermaids, counts) {
+    var k = mermaids.length;
+    if (!k) return [];
+    // Only the k+1 biggest colour groups can appear in a best assignment: the deduction
+    // is at most 1, and an unused bigger group is always at least as good as a smaller one.
+    var colors = Object.keys(counts).sort(function (a, b) {
+      return counts[b] - counts[a] || (a < b ? -1 : 1);
+    }).slice(0, k + 1);
+
+    function value(i, color) {
+      var n = counts[color] - (mermaids[i].color === color ? 1 : 0);
+      return n > 0 ? n : 0;
+    }
+
+    if (k === 1) {
+      var best = null;
+      for (var c = 0; c < colors.length; c++) {
+        var v = value(0, colors[c]);
+        if (!best || v > best.n) best = { color: colors[c], n: v };
+      }
+      return [best];
+    }
+
+    var used = [], choice = [], bestChoice = null, bestTotal = -1;
+    (function search(i, total) {
+      if (i === k) {
+        if (total > bestTotal) { bestTotal = total; bestChoice = choice.slice(); }
+        return;
+      }
+      var placed = false;
+      for (var ci = 0; ci < colors.length; ci++) {
+        if (used[ci]) continue;
+        used[ci] = true;
+        choice[i] = colors[ci];
+        placed = true;
+        search(i + 1, total + value(i, colors[ci]));
+        used[ci] = false;
+      }
+      if (!placed) { // more Mermaids than colours held
+        choice[i] = null;
+        search(i + 1, total);
+      }
+    })(0, 0);
+
+    return bestChoice.map(function (color, i) {
+      return color ? { color: color, n: value(i, color) } : null;
+    });
+  }
+
+  // Every card of one colour a player owns, optionally skipping one (a Mermaid
+  // does not count itself towards the colour it scores).
+  function cardsOfColour(p, color, skipId) {
+    var all = p.hand.slice().concat(p.hurricanes || []);
+    for (var i = 0; i < p.pairs.length; i++) all = all.concat(p.pairs[i].cards);
+    return all.filter(function (c) { return c.color === color && c.id !== skipId; });
+  }
+
+  function bonusOf(p) {
+    var t = colorTally(p);
+    return t.sorted[0] ? { n: t.sorted[0].n, color: t.sorted[0].color } : { n: 0, color: null };
+  }
+
+  // Full score: played duos + collectors in hand + mermaids in hand.
+  function scoreDetail(p, mods) {
+    mods = mods || NO_MODS;
+    var lines = [], total = 0;
+    var tally = colorTally(p);
+
+    if (p.pairs.length) {
+      var pairPts = p.pairs.length * mods.pairValue;
+      var pairCards = [];
+      for (var pi = 0; pi < p.pairs.length; pi++) pairCards = pairCards.concat(p.pairs[pi].cards);
+      lines.push({
+        cards: clone(pairCards),
+        label: p.pairs.length + (p.pairs.length === 1 ? ' duo pair' : ' duo pairs') +
+          (mods.pairValue !== 1 ? ' \u00d7' + mods.pairValue : ''),
+        pts: pairPts
+      });
+      total += pairPts;
+    }
+
+    var cc = {}, byType = {}, held = [];
+    for (var i = 0; i < p.hand.length; i++) {
+      var c = p.hand[i];
+      if (c.type === 'hurricane') { held.push(c); continue; }
+      if (CARD_TYPES[c.type].kind !== 'collector') continue;
+      cc[c.type] = (cc[c.type] || 0) + 1;
+      (byType[c.type] = byType[c.type] || []).push(c);
+    }
+    for (var t = 0; t < TYPE_ORDER.length; t++) {
+      var type = TYPE_ORDER[t];
+      if (!cc[type]) continue;
+      var chart = CARD_TYPES[type].chart;
+      var n = Math.min(cc[type], chart.length - 1);
+      var pts = chart[n] || 0;
+      if (type === 'jellyfish' && mods.jellyZero) pts = 0;
+      lines.push({
+        label: cc[type] + '\u00d7 ' + CARD_TYPES[type].name, pts: pts,
+        cards: clone(byType[type])
+      });
+      total += pts;
+    }
+
+    if (held.length) {
+      var heldPts = held.length * CARD_TYPES.hurricane.penalty;
+      lines.push({ label: held.length + '\u00d7 Hurricane in hand', pts: heldPts, cards: clone(held) });
+      total += heldPts;
+    }
+
+    // multipliers: so many points per card of one type, hand and table alike
+    var owned = p.hand.slice();
+    for (var oi = 0; oi < p.pairs.length; oi++) owned = owned.concat(p.pairs[oi].cards);
+    for (var mi = 0; mi < p.hand.length; mi++) {
+      var mc = p.hand[mi];
+      var mdef = CARD_TYPES[mc.type];
+      if (mdef.kind !== 'multiplier') continue;
+      var counted = owned.filter(function (c) { return c.type === mdef.per; });
+      var mpts = counted.length * mdef.rate;
+      lines.push({
+        label: mdef.name + ' \u2014 ' + mdef.rate + ' per ' + CARD_TYPES[mdef.per].name +
+          ' \u00d7' + counted.length,
+        pts: mpts, cards: [clone(mc)], counted: clone(counted)
+      });
+      total += mpts;
+    }
+
+    var flown = (p.hurricanes || []).length;
+    if (flown) {
+      var flownPts = flown * CARD_TYPES.hurricane.penalty;
+      lines.push({
+        label: flown + '\u00d7 Hurricane played', pts: flownPts, cards: clone(p.hurricanes)
+      });
+      total += flownPts;
+    }
+
+    var mermaids = p.hand.filter(function (c) { return c.type === 'mermaid'; });
+    var awards = mermaidAwards(mermaids, tally.counts);
+    for (var m = 0; m < awards.length; m++) {
+      var slot = awards[m];
+      var mp = (slot ? slot.n : 0) * mods.mermaidMul;
+      lines.push({
+        label: 'Mermaid \u2192 ' + (slot ? slot.color : 'no colour left') + (mods.mermaidMul !== 1 ? ' \u00d7' + mods.mermaidMul : ''),
+        pts: mp, color: slot ? slot.color : null,
+        cards: [clone(mermaids[m])],
+        counted: slot ? clone(cardsOfColour(p, slot.color, mermaids[m].id)) : []
+      });
+      total += mp;
+    }
+
+    return {
+      total: total,
+      lines: lines,
+      colorCounts: tally.counts,
+      sortedColors: tally.sorted,
+      bonusColor: tally.sorted[0] ? tally.sorted[0].color : null,
+      bonus: tally.sorted[0] ? tally.sorted[0].n : 0
+    };
+  }
+
+  function playedOnlyDetail(p, mods) {
+    mods = mods || NO_MODS;
+    var pts = p.pairs.length * mods.pairValue + (p.hurricanes || []).length * CARD_TYPES.hurricane.penalty;
+    var onTable = [];
+    for (var pi = 0; pi < p.pairs.length; pi++) onTable = onTable.concat(p.pairs[pi].cards);
+    return {
+      total: pts,
+      lines: p.pairs.length
+        ? [{
+            label: p.pairs.length + (p.pairs.length === 1 ? ' duo pair' : ' duo pairs') + ' (hand forfeited)',
+            pts: pts, cards: clone(onTable)
+          }]
+        : [{ label: 'Nothing played on the table', pts: 0, cards: [] }],
+      colorCounts: colorTally(p).counts,
+      sortedColors: colorTally(p).sorted,
+      bonusColor: null,
+      bonus: 0
+    };
+  }
+
+  function currentPoints(p, mods) { return scoreDetail(p, mods).total; }
+
+  /* ---------- game construction ---------- */
+
+  function createGame(playerDefs, configOverride) {
+    var n = playerDefs.length;
+    var cfg = defaultConfig(n);
+    if (configOverride) for (var k in configOverride) if (configOverride[k] != null) cfg[k] = configOverride[k];
+    cfg.pileCount = cfg.pileCount === 3 ? 3 : 2;
+
+    var state = {
+      config: cfg,
+      players: playerDefs.map(function (d, i) {
+        return {
+          id: d.id, name: d.name, bot: !!d.bot, connected: d.connected !== false,
+          hand: [], pairs: [], hurricanes: [],
+          total: 0, roundScore: 0,
+          roundsWon: 0, gamesWon: 0
+        };
+      }),
+      roundNo: 0,
+      starter: 0,
+      turn: 0,
+      phase: 'action',
+      tide: null,
+      ready: {},
+      steal: null,
+      storm: null,
+      stormSeq: 0,
+      pendingHurricane: null,
+      stealOrder: null,
+      stealSeq: 0,
+      crabPile: null,
+      deck: [],
+      discards: [],
+      drawn: null,
+      pairPlayed: false,
+      lastChance: null,
+      roundResult: null,
+      winnerId: null,
+      log: [],
+      version: 0
+    };
+    startRound(state);
+    return state;
+  }
+
+  function emptyPiles(cfg) {
+    var piles = [];
+    for (var i = 0; i < cfg.pileCount; i++) piles.push([]);
+    return piles;
+  }
+
+  function startRound(state) {
+    state.roundNo++;
+    state.tide = state.config.stormSeason ? pickTide(state) : null;
+
+    var deck = shuffle(buildDeck(state.config));
+    var trim = modsOf(state).deckTrim;
+    if (trim > 0) deck = deck.slice(trim);
+    state.deck = deck;
+
+    state.discards = emptyPiles(state.config);
+    // Every pile opens with one card face up, so there is something to take from turn one.
+    for (var d = 0; d < state.discards.length && state.deck.length; d++) {
+      state.discards[d].push(state.deck.pop());
+    }
+    state.ready = {};
+    state.steal = null;
+    state.storm = null;
+    state.pendingHurricane = null;
+    state.crabPile = null;
+    state.drawn = null;
+    state.pairPlayed = false;
+    state.lastChance = null;
+    state.roundResult = null;
+    state.phase = 'action';
+    state.turn = state.starter;
+    for (var i = 0; i < state.players.length; i++) {
+      state.players[i].hand = [];
+      state.players[i].pairs = [];
+      state.players[i].hurricanes = [];
+      state.players[i].roundScore = 0;
+    }
+    log(state, 'Round ' + state.roundNo + ' begins. ' + state.discards.length +
+      ' cards are turned face up. ' + state.players[state.turn].name + ' goes first.', 'big');
+    if (state.tide) log(state, 'Tide: ' + state.tide.name + ' \u2014 ' + state.tide.blurb, 'tide');
+  }
+
+  function log(state, text, tone) {
+    state.log.push({ text: text, tone: tone || '' });
+    if (state.log.length > 250) state.log.splice(0, state.log.length - 250);
+  }
+
+  function validPile(state, pile) {
+    var p = Math.floor(Number(pile));
+    return (p >= 0 && p < state.discards.length) ? p : -1;
+  }
+
+  function anyPileHasCards(state) {
+    for (var i = 0; i < state.discards.length; i++) if (state.discards[i].length) return true;
+    return false;
+  }
+
+  function indexOfId(state, id) {
+    for (var i = 0; i < state.players.length; i++) if (state.players[i].id === id) return i;
+    return -1;
+  }
+
+  /* ---------- turn flow ---------- */
+
+  // Some cards end the game the moment you hold enough of them.
+  function sweepTypes(cfg) {
+    return typesInPlay(cfg).filter(function (t) { return CARD_TYPES[t].sweep; });
+  }
+
+  function checkSweep(state) {
+    var types = sweepTypes(state.config);
+    for (var i = 0; i < state.players.length; i++) {
+      var p = state.players[i];
+      for (var t = 0; t < types.length; t++) {
+        var type = types[t];
+        var held = p.hand.filter(function (c) { return c.type === type; }).length;
+        if (held >= CARD_TYPES[type].sweep) {
+          endGameBySweep(state, i, type);
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  function endGameBySweep(state, idx, type) {
+    var p = state.players[idx];
+    var def = CARD_TYPES[type];
+    var words = { 3: 'Three', 4: 'All four' };
+    var plural = def.plural || (def.name + 's');
+    var label = (words[def.sweep] || def.sweep) + ' ' + plural + ' \u2014 instant win';
+    state.phase = 'gameEnd';
+    state.winnerId = p.id;
+    state.roundResult = {
+      reason: 'sweep',
+      sweepType: type,
+      callerId: p.id,
+      success: true,
+      rows: state.players.map(function (pl) {
+        var isWinner = pl.id === p.id;
+        return {
+          id: pl.id, name: pl.name, mode: 'reveal', points: 0,
+          detail: {
+            total: 0,
+            lines: [{ label: isWinner ? label : 'Round not scored', pts: 0 }],
+            colorCounts: colorTally(pl).counts,
+            sortedColors: colorTally(pl).sorted
+          },
+          hand: clone(pl.hand), pairs: clone(pl.pairs), total: pl.total
+        };
+      })
+    };
+    state.players[idx].gamesWon++;
+    log(state, p.name + ' gathered ' + ((words[def.sweep] || def.sweep).toLowerCase()) + ' ' +
+      plural + ' and wins the game instantly!', 'win');
+  }
+
+  function nextPlayer(state) {
+    state.turn = (state.turn + 1) % state.players.length;
+  }
+
+  function endTurn(state) {
+    state.pairPlayed = false;
+    state.drawn = null;
+
+    if (state.lastChance) {
+      state.lastChance.turnsLeft--;
+      if (state.lastChance.turnsLeft <= 0) {
+        resolveLastChance(state);
+        return;
+      }
+      nextPlayer(state);
+      state.phase = 'action';
+      log(state, 'Last Chance \u2014 ' + state.players[state.turn].name + ' takes a final turn.');
+      return;
+    }
+
+    if (state.config.voidOnEmptyDeck && state.deck.length === 0) {
+      state.phase = 'roundEnd';
+      state.roundResult = {
+        reason: 'deck',
+        callerId: null,
+        success: false,
+        rows: state.players.map(function (p) {
+          return {
+            id: p.id, name: p.name, mode: 'void', points: 0,
+            detail: { total: 0, lines: [{ label: 'Deck ran out \u2014 round scores nothing', pts: 0 }], colorCounts: colorTally(p).counts, sortedColors: colorTally(p).sorted },
+            hand: clone(p.hand), pairs: clone(p.pairs), total: p.total
+          };
+        })
+      };
+      log(state, 'The deck ran out. The round ends and nobody scores.', 'big');
+      return;
+    }
+
+    nextPlayer(state);
+    state.phase = 'action';
+  }
+
+  /* ---------- round resolution ---------- */
+
+  function bonusOnlyDetail(p) {
+    var b = bonusOf(p);
+    var tally = colorTally(p);
+    return {
+      total: b.n,
+      lines: [{
+        label: b.color
+          ? 'Colour bonus only \u2014 ' + b.n + '\u00d7 ' + b.color + ' (Last Chance lost)'
+          : 'Nothing left to score (Last Chance lost)',
+        pts: b.n, color: b.color,
+        cards: [],
+        counted: b.color ? clone(cardsOfColour(p, b.color)) : []
+      }],
+      colorCounts: tally.counts, sortedColors: tally.sorted,
+      bonusColor: b.color, bonus: b.n
+    };
+  }
+
+  function rowFor(p, mode, mods, withBonus) {
+    var d = mode === 'bonusOnly' ? bonusOnlyDetail(p)
+          : mode === 'played' ? playedOnlyDetail(p, mods)
+          : scoreDetail(p, mods);
+    var row = {
+      id: p.id, name: p.name, mode: mode, points: d.total, detail: d,
+      hand: clone(p.hand), pairs: clone(p.pairs), total: p.total
+    };
+    if (mode !== 'played' && withBonus) {
+      var b = bonusOf(p);
+      d.lines.push({
+        label: 'Colour bonus \u2014 ' + b.n + '\u00d7 ' + b.color, pts: b.n, color: b.color,
+        cards: [],
+        counted: b.color ? clone(cardsOfColour(p, b.color)) : []
+      });
+      d.total += b.n;
+      row.points = d.total;
+      row.bonusApplied = true;
+    }
+    return row;
+  }
+
+  function finishRound(state, rows, reason, callerId, success) {
+    for (var i = 0; i < rows.length; i++) {
+      var idx = indexOfId(state, rows[i].id);
+      state.players[idx].roundScore = rows[i].points;
+      state.players[idx].total += rows[i].points;
+      rows[i].total = state.players[idx].total;
+    }
+    // whoever scored most takes the round; a tie gives it to nobody
+    var best = -Infinity, winners = [];
+    rows.forEach(function (r) {
+      if (r.points > best) { best = r.points; winners = [r.id]; }
+      else if (r.points === best) winners.push(r.id);
+    });
+    var roundWinnerId = (winners.length === 1 && best > 0) ? winners[0] : null;
+    if (roundWinnerId) state.players[indexOfId(state, roundWinnerId)].roundsWon++;
+
+    // bots never need to read a scoreboard, so they are ready straight away
+    state.ready = {};
+    state.players.forEach(function (pl) { if (pl.bot || !pl.connected) state.ready[pl.id] = true; });
+
+    state.roundResult = {
+      reason: reason, callerId: callerId, success: success, rows: rows,
+      roundWinnerId: roundWinnerId,
+      tide: state.tide ? clone(state.tide) : null
+    };
+    state.phase = 'roundEnd';
+
+    var reached = false;
+    for (var j = 0; j < state.players.length; j++) {
+      if (state.players[j].total >= state.config.targetScore) reached = true;
+    }
+    if (reached) {
+      var top = state.players.slice().sort(function (a, b) { return b.total - a.total; })[0];
+      state.winnerId = top.id;
+      state.players[indexOfId(state, top.id)].gamesWon++;
+      state.phase = 'gameEnd';
+      log(state, top.name + ' reaches ' + top.total + ' points and wins the game!', 'win');
+    }
+  }
+
+  function resolveStop(state, callerIdx) {
+    var mods = modsOf(state);
+    var rows = state.players.map(function (p) { return rowFor(p, 'full', mods, mods.bonusForAll); });
+    log(state, state.players[callerIdx].name + ' called STOP. Everyone scores their cards.', 'big');
+    finishRound(state, rows, 'stop', state.players[callerIdx].id, true);
+  }
+
+  function resolveLastChance(state) {
+    var mods = modsOf(state);
+    var callerIdx = state.lastChance.callerIdx;
+    var caller = state.players[callerIdx];
+    var callerScore = scoreDetail(caller, mods).total;
+
+    var bestIdx = -1, bestScore = -Infinity;
+    for (var s2 = 1; s2 < state.players.length; s2++) {
+      var i = (callerIdx + s2) % state.players.length;
+      var sc = scoreDetail(state.players[i], mods).total;
+      if (sc > bestScore) { bestScore = sc; bestIdx = i; }
+    }
+
+    var success = callerScore > bestScore;
+    var rows = [];
+
+    if (success) {
+      rows.push(rowFor(caller, 'full', mods, true));
+      for (var a2 = 0; a2 < state.players.length; a2++) {
+        if (a2 !== callerIdx) rows.push(rowFor(state.players[a2], 'played', mods, false));
+      }
+      log(state, caller.name + ' survived Last Chance with ' + callerScore + ' against ' + bestScore +
+        ' and takes the colour bonus.', 'big');
+    } else {
+      for (var b2 = 0; b2 < state.players.length; b2++) {
+        var p = state.players[b2];
+        if (b2 === callerIdx) rows.push(rowFor(p, 'bonusOnly', mods, false));
+        else if (b2 === bestIdx) rows.push(rowFor(p, 'full', mods, true));
+        else rows.push(rowFor(p, 'full', mods, mods.bonusForAll));
+      }
+      log(state, caller.name + ' lost Last Chance (' + callerScore + ' against ' + bestScore + '). ' +
+        state.players[bestIdx].name + ' scores in full; ' + caller.name + ' is left with only a colour bonus.', 'big');
+    }
+
+    rows.sort(function (x, y) { return indexOfId(state, x.id) - indexOfId(state, y.id); });
+    state.lastChance = null;
+    finishRound(state, rows, 'last', caller.id, success);
+  }
+
+  /* ---------- actions ---------- */
+
+  function fail(msg) { return { ok: false, error: msg }; }
+  var OK = { ok: true };
+
+  function act(state, playerId, action) {
+    if (state.phase === 'gameEnd') {
+      if (action.type === 'newGame') return doNewGame(state);
+      return fail('The game is over.');
+    }
+    if (state.phase === 'roundEnd') {
+      if (action.type === 'ready') {
+        state.ready[playerId] = true;
+        state.version++;
+        return OK;
+      }
+      if (action.type === 'nextRound') {
+        state.starter = (state.starter + 1) % state.players.length;
+        startRound(state);
+        state.version++;
+        return OK;
+      }
+      return fail('The round is over.');
+    }
+
+    var idx = indexOfId(state, playerId);
+    if (idx < 0) return fail('Unknown player.');
+    if (idx !== state.turn) return fail('It is not your turn.');
+    var p = state.players[idx];
+    var res;
+
+    switch (action.type) {
+      case 'drawTwo':    res = doDrawTwo(state, p); break;
+      case 'keepCard':   res = doKeepCard(state, p, action); break;
+      case 'takeDiscard':res = doTakeDiscard(state, p, action); break;
+      case 'playPair':   res = doPlayPair(state, p, action); break;
+      case 'playHurricane': res = doPlayHurricane(state, p, action); break;
+      case 'hurricaneSwap': res = doHurricaneSwap(state, p, action); break;
+      case 'crabPickPile': res = doCrabPickPile(state, p, action); break;
+      case 'crabTake':   res = doCrabTake(state, p, action); break;
+      case 'sharkSteal': res = doSharkSteal(state, p, action); break;
+      case 'endTurn':    res = doEndTurn(state, p); break;
+      case 'declare':    res = doDeclare(state, p, idx, action); break;
+      default: return fail('Unknown action.');
+    }
+
+    if (res.ok) {
+      if (state.phase !== 'gameEnd' && state.phase !== 'roundEnd') checkSweep(state);
+      state.version++;
+    }
+    return res;
+  }
+
+  function doNewGame(state) {
+    for (var i = 0; i < state.players.length; i++) {
+      state.players[i].total = 0;
+      state.players[i].roundScore = 0;
+    }
+    state.roundNo = 0;
+    state.winnerId = null;
+    state.starter = 0;
+    state.tide = null;
+    state.log = [];
+    startRound(state);
+    state.version++;
+    return OK;
+  }
+
+  function doDrawTwo(state, p) {
+    if (state.phase !== 'action') return fail('You have already drawn this turn.');
+    if (state.deck.length === 0) return fail('The deck is empty.');
+    if (state.deck.length === 1) {
+      var only = state.deck.pop();
+      p.hand.push(only);
+      state.phase = 'pair';
+      log(state, p.name + ' took the last card of the deck.');
+      return OK;
+    }
+    state.drawn = [state.deck.pop(), state.deck.pop()];
+    state.phase = 'keep';
+    return OK;
+  }
+
+  function doKeepCard(state, p, a) {
+    if (state.phase !== 'keep' || !state.drawn) return fail('Nothing to keep right now.');
+    var pile = validPile(state, a.pile);
+    if (pile < 0) return fail('That discard pile does not exist.');
+    var keepIdx = a.keepIndex === 1 ? 1 : 0;
+    var kept = state.drawn[keepIdx];
+    var tossed = state.drawn[1 - keepIdx];
+    p.hand.push(kept);
+    state.discards[pile].push(tossed);
+    state.drawn = null;
+    state.phase = 'pair';
+    log(state, p.name + ' drew two and discarded ' + describe(tossed) + ' onto pile ' + (pile + 1) + '.');
+    return OK;
+  }
+
+  function doTakeDiscard(state, p, a) {
+    if (state.phase !== 'action') return fail('You have already drawn this turn.');
+    var pile = validPile(state, a.pile);
+    if (pile < 0) return fail('That discard pile does not exist.');
+    if (!state.discards[pile].length) return fail('That discard pile is empty.');
+    var card = state.discards[pile].pop();
+    p.hand.push(card);
+    state.phase = 'pair';
+    log(state, p.name + ' took ' + describe(card) + ' from pile ' + (pile + 1) + '.');
+    return OK;
+  }
+
+  function doPlayPair(state, p, a) {
+    if (state.phase !== 'pair') return fail('You can only play a pair after drawing.');
+    var ids = a.cardIds || [];
+    if (ids.length !== 2 || ids[0] === ids[1]) return fail('Select exactly two cards.');
+    var i0 = findCard(p.hand, ids[0]), i1 = findCard(p.hand, ids[1]);
+    if (i0 < 0 || i1 < 0) return fail('Those cards are not in your hand.');
+    var c0 = p.hand[i0], c1 = p.hand[i1];
+    var d0 = CARD_TYPES[c0.type], d1 = CARD_TYPES[c1.type];
+    if (d0.kind !== 'duo' || d1.kind !== 'duo') return fail('Only duo cards can be paired.');
+    if (d0.partner !== c1.type || d1.partner !== c0.type) return fail('Those two cards are not a duo.');
+
+    // remove (higher index first)
+    var hi = Math.max(i0, i1), lo = Math.min(i0, i1);
+    p.hand.splice(hi, 1); p.hand.splice(lo, 1);
+
+    var kind = (c0.type === 'swimmer' || c0.type === 'shark') ? 'swimmerShark' : c0.type;
+    p.pairs.push({ kind: kind, cards: [c0, c1] });
+    log(state, p.name + ' played a ' + pairName(kind) + ' pair.', 'pair');
+
+    if (kind === 'boat') {
+      state.pairPlayed = false;
+      state.phase = 'action';
+      log(state, p.name + ' sails on and takes another turn.');
+      return OK;
+    }
+    if (kind === 'fish') {
+      if (state.deck.length) {
+        p.hand.push(state.deck.pop());
+        log(state, p.name + ' drew a card from the deck.');
+      } else {
+        log(state, 'The deck is empty \u2014 no card to draw.');
+      }
+      return OK;
+    }
+    if (kind === 'crab') {
+      if (!anyPileHasCards(state)) {
+        log(state, 'Every discard pile is empty \u2014 the Crab finds nothing.');
+        return OK;
+      }
+      // Commit to a pile first; only then do you get to look through it.
+      state.crabPile = null;
+      state.phase = 'crabPile';
+      return OK;
+    }
+    if (kind === 'swimmerShark') {
+      var anyone = state.players.some(function (o) { return stealable(state, p, o); });
+      if (!anyone) {
+        log(state, 'Nobody has cards you can take.');
+        return OK;
+      }
+      // Shuffle each rival's fan so slot order says nothing about when a card was picked up.
+      state.stealOrder = {};
+      for (var si = 0; si < state.players.length; si++) {
+        var o = state.players[si];
+        if (!stealable(state, p, o)) continue;
+        var order = [];
+        for (var oi = 0; oi < o.hand.length; oi++) order.push(oi);
+        state.stealOrder[o.id] = shuffle(order);
+      }
+      state.phase = 'shark';
+      return OK;
+    }
+    return OK;
+  }
+
+  // The Hurricane trades everything you are holding and everything on your table
+  // with a rival. The card itself stays with you, as the price of doing it.
+  function doPlayHurricane(state, p, a) {
+    if (state.phase !== 'pair') return fail('You can only play the Hurricane after drawing.');
+    var i = findCard(p.hand, a.cardId);
+    if (i < 0) return fail('That card is not in your hand.');
+    if (p.hand[i].type !== 'hurricane') return fail('That is not the Hurricane.');
+    var anyone = state.players.some(function (o) { return swappable(state, p, o); });
+    if (!anyone) return fail('There is nobody to swap with.');
+    state.pendingHurricane = p.hand[i].id;
+    state.phase = 'hurricane';
+    return OK;
+  }
+
+  // Whoever called Last Chance has locked their cards, so they cannot be swapped either.
+  function swappable(state, me, other) {
+    if (other.id === me.id) return false;
+    if (state.lastChance && state.lastChance.callerId === other.id) return false;
+    return true;
+  }
+
+  function doHurricaneSwap(state, p, a) {
+    if (state.phase !== 'hurricane') return fail('No Hurricane is in play.');
+    var t = indexOfId(state, a.targetId);
+    if (t < 0) return fail('Unknown player.');
+    var target = state.players[t];
+    if (!swappable(state, p, target)) return fail('You cannot swap with them.');
+
+    var i = findCard(p.hand, state.pendingHurricane);
+    if (i < 0) { state.phase = 'pair'; state.pendingHurricane = null; return fail('The Hurricane is gone.'); }
+    var storm = p.hand.splice(i, 1)[0];
+
+    var myHand = p.hand, myPairs = p.pairs;
+    p.hand = target.hand;
+    p.pairs = target.pairs;
+    target.hand = myHand;
+    target.pairs = myPairs;
+
+    // the storm stays with whoever unleashed it
+    p.hurricanes = (p.hurricanes || []).concat([storm]);
+
+    state.pendingHurricane = null;
+    state.phase = 'pair';
+    state.stormSeq = (state.stormSeq || 0) + 1;
+    state.storm = { seq: state.stormSeq, byId: p.id, withId: target.id, card: clone(storm) };
+    log(state, p.name + ' played the Hurricane and swapped everything with ' + target.name + '!', 'big');
+    return OK;
+  }
+
+  function doCrabPickPile(state, p, a) {
+    if (state.phase !== 'crabPile') return fail('You are not choosing a pile.');
+    var pile = validPile(state, a.pile);
+    if (pile < 0) return fail('That discard pile does not exist.');
+    if (!state.discards[pile].length) return fail('That pile is empty \u2014 pick another.');
+    state.crabPile = pile;
+    state.phase = 'crab';
+    log(state, p.name + ' sends the Crab into pile ' + (pile + 1) + '.');
+    return OK;
+  }
+
+  function doCrabTake(state, p, a) {
+    if (state.phase !== 'crab') return fail('No Crab effect is pending.');
+    var pile = state.crabPile;
+    if (pile == null) return fail('Choose a pile first.');
+    if (a.pile != null && validPile(state, a.pile) !== pile) return fail('You already committed to another pile.');
+    var i = findCard(state.discards[pile], a.cardId);
+    if (i < 0) return fail('That card is not in that pile.');
+    var card = state.discards[pile].splice(i, 1)[0];
+    p.hand.push(card);
+    state.phase = 'pair';
+    state.crabPile = null;
+    var fromTop = i === state.discards[pile].length;
+    log(state, fromTop
+      ? p.name + ' took ' + describe(card) + ' off the top of pile ' + (pile + 1) + '.'
+      : p.name + ' fished a card out of pile ' + (pile + 1) + '.');
+    return OK;
+  }
+
+  // You cannot reach into the hand of whoever called Last Chance: they are betting
+  // on exactly the cards they hold, so those are locked for the final turns.
+  function stealable(state, thief, other) {
+    if (other.id === thief.id) return false;
+    if (!other.hand.length) return false;
+    if (state.lastChance && state.lastChance.callerId === other.id) return false;
+    return true;
+  }
+
+  function doSharkSteal(state, p, a) {
+    if (state.phase !== 'shark') return fail('No steal is pending.');
+    var t = indexOfId(state, a.targetId);
+    if (t < 0) return fail('Unknown target.');
+    var target = state.players[t];
+    if (target.id === p.id) return fail('You cannot steal from yourself.');
+    if (state.lastChance && state.lastChance.callerId === target.id) {
+      return fail('That hand is locked \u2014 they called Last Chance.');
+    }
+    if (!target.hand.length) return fail('That player has no cards.');
+
+    // The thief picks a position in the victim's fan. Card faces are never sent to
+    // them, so it is still a gamble — just not the computer's gamble.
+    var pick;
+    if (a.cardIndex == null) {
+      pick = Math.floor(Math.random() * target.hand.length);
+    } else {
+      var slot = Math.floor(Number(a.cardIndex));
+      if (!(slot >= 0 && slot < target.hand.length)) return fail('There is no card in that position.');
+      // The slot the thief tapped maps through the shuffle, not straight into the hand.
+      var order = state.stealOrder && state.stealOrder[target.id];
+      pick = (order && order[slot] != null && order[slot] < target.hand.length) ? order[slot] : slot;
+    }
+
+    var card = target.hand.splice(pick, 1)[0];
+    p.hand.push(card);
+    state.phase = 'pair';
+    state.stealOrder = null;
+    state.stealSeq = (state.stealSeq || 0) + 1;
+    state.steal = { seq: state.stealSeq, fromId: target.id, toId: p.id, index: pick, card: clone(card) };
+    log(state, p.name + ' reached into ' + target.name + '\u2019s hand and took a card.', 'pair');
+    return OK;
+  }
+
+  function doEndTurn(state, p) {
+    if (state.phase === 'action' && canPass(state)) {
+      log(state, p.name + ' has nothing to draw and passes.');
+      endTurn(state);
+      return OK;
+    }
+    if (state.phase !== 'pair') return fail('Finish your turn first.');
+    endTurn(state);
+    return OK;
+  }
+
+  // Only ever true deep in a Last Chance where the deck and both piles have run dry.
+  function canPass(state) { return state.deck.length === 0 && !anyPileHasCards(state); }
+
+  function doDeclare(state, p, idx, a) {
+    if (state.phase !== 'pair') return fail('You can only declare at the end of your turn.');
+    if (state.lastChance) return fail('Last Chance is already running.');
+    var mods = modsOf(state);
+    var need = threshold(state);
+    var pts = currentPoints(p, mods);
+    if (pts < need) return fail('You need at least ' + need + ' points to declare.');
+    if (a.kind === 'stop') {
+      resolveStop(state, idx);
+      return OK;
+    }
+    if (a.kind === 'last') {
+      if (mods.noLastChance) return fail('Dead Calm: Last Chance is off this round.');
+      state.lastChance = { callerIdx: idx, callerId: p.id, turnsLeft: state.players.length - 1 };
+      log(state, p.name + ' called LAST CHANCE with ' + pts + ' points. Everyone else gets one more turn.', 'big');
+      state.pairPlayed = false;
+      state.drawn = null;
+      nextPlayer(state);
+      state.phase = 'action';
+      return OK;
+    }
+    return fail('Unknown declaration.');
+  }
+
+  /* ---------- utilities ---------- */
+
+  function findCard(list, id) {
+    for (var i = 0; i < list.length; i++) if (list[i].id === id) return i;
+    return -1;
+  }
+
+  function describe(c) { return c.color + ' ' + CARD_TYPES[c.type].name; }
+
+  function pairName(kind) {
+    return kind === 'swimmerShark' ? 'Swimmer + Shark' : CARD_TYPES[kind].name + ' + ' + CARD_TYPES[kind].name;
+  }
+
+  function availablePairs(hand) {
+    var out = [], byType = {};
+    for (var i = 0; i < hand.length; i++) {
+      var c = hand[i];
+      if (CARD_TYPES[c.type].kind !== 'duo') continue;
+      (byType[c.type] = byType[c.type] || []).push(c);
+    }
+    ['crab', 'boat', 'fish'].forEach(function (t) {
+      if (byType[t] && byType[t].length >= 2) out.push({ kind: t, cards: [byType[t][0], byType[t][1]] });
+    });
+    if (byType.swimmer && byType.shark) out.push({ kind: 'swimmerShark', cards: [byType.swimmer[0], byType.shark[0]] });
+    return out;
+  }
+
+  /* ---------- per-player view ---------- */
+
+  // Open Sea: collector cards are public, everything else stays hidden.
+  function revealedOf(state, p) {
+    if (!state.config.openSea) return [];
+    return clone(p.hand.filter(function (c) { return CARD_TYPES[c.type].kind === 'collector'; }));
+  }
+
+  function publicPlayer(state, p, viewerId) {
+    var shown = p.id === viewerId ? [] : revealedOf(state, p);
+    return {
+      id: p.id,
+      name: p.name,
+      bot: p.bot,
+      connected: p.connected,
+      handCount: p.hand.length,
+      revealed: shown,
+      hiddenCount: p.hand.length - shown.length,
+      pairs: clone(p.pairs),
+      hurricanes: clone(p.hurricanes || []),
+      total: p.total,
+      roundScore: p.roundScore,
+      roundsWon: p.roundsWon || 0,
+      gamesWon: p.gamesWon || 0,
+      isYou: p.id === viewerId
+    };
+  }
+
+  function view(state, viewerId) {
+    var idx = indexOfId(state, viewerId);
+    var me = idx >= 0 ? state.players[idx] : null;
+    var isTurn = idx >= 0 && idx === state.turn && state.phase !== 'roundEnd' && state.phase !== 'gameEnd';
+    var mods = modsOf(state);
+    var v = {
+      version: state.version,
+      config: state.config,
+      tide: state.tide ? clone(state.tide) : null,
+      threshold: threshold(state),
+      noLastChance: mods.noLastChance,
+      roundNo: state.roundNo,
+      phase: state.phase,
+      turnId: state.players[state.turn] ? state.players[state.turn].id : null,
+      yourTurn: isTurn,
+      players: state.players.map(function (p) { return publicPlayer(state, p, viewerId); }),
+      deckCount: state.deck.length,
+      pileCount: state.discards.length,
+      discardTops: state.discards.map(function (pile) {
+        return pile.length ? clone(pile[pile.length - 1]) : null;
+      }),
+      discardCounts: state.discards.map(function (pile) { return pile.length; }),
+      you: me ? {
+        id: me.id,
+        hand: clone(me.hand),
+        pairs: clone(me.pairs),
+        hurricanes: clone(me.hurricanes || []),
+        points: currentPoints(me, mods),
+        detail: scoreDetail(me, mods),
+        pairsAvailable: availablePairs(me.hand).map(function (pr) { return { kind: pr.kind, cardIds: [pr.cards[0].id, pr.cards[1].id] }; })
+      } : null,
+      drawn: (isTurn && state.phase === 'keep' && state.drawn) ? clone(state.drawn) : null,
+      crabPile: state.crabPile,
+      crabPiles: (isTurn && state.phase === 'crab' && state.crabPile != null)
+        ? state.discards.map(function (pile, i) { return i === state.crabPile ? clone(pile) : null; })
+        : null,
+      pairPlayed: state.pairPlayed,
+      mustPass: isTurn && state.phase === 'action' && canPass(state),
+      storm: state.storm ? clone(state.storm) : null,
+      steal: state.steal ? {
+        seq: state.steal.seq,
+        fromId: state.steal.fromId,
+        toId: state.steal.toId,
+        // only the thief needs the position; only thief and victim may see the face
+        index: viewerId === state.steal.toId ? state.steal.index : null,
+        card: (viewerId === state.steal.toId || viewerId === state.steal.fromId)
+          ? clone(state.steal.card) : null
+      } : null,
+      lastChance: state.lastChance ? { callerId: state.lastChance.callerId, turnsLeft: state.lastChance.turnsLeft } : null,
+      ready: clone(state.ready || {}),
+      readyCount: Object.keys(state.ready || {}).length,
+      allReady: state.players.every(function (pl) { return (state.ready || {})[pl.id]; }),
+      youReady: !!(state.ready || {})[viewerId],
+      roundResult: state.roundResult ? clone(state.roundResult) : null,
+      winnerId: state.winnerId,
+      // with the log switched off nothing is sent, so it cannot be dug out of the page
+      log: state.config.tableLog === false ? [] : state.log.slice(-60)
+    };
+    if (v.you) {
+      v.canDeclare = isTurn && state.phase === 'pair' && !state.lastChance && v.you.points >= v.threshold;
+    }
+    return v;
+  }
+
+  return {
+    CARD_TYPES: CARD_TYPES,
+    TYPE_ORDER: TYPE_ORDER,
+    COUNTS: COUNTS,
+    COLORS: COLORS,
+    TIDES: TIDES,
+    tidePool: tidePool,
+    tideByKey: tideByKey,
+    sweepTypes: sweepTypes,
+    typesInPlay: typesInPlay,
+    deckSize: deckSize,
+    modsOf: modsOf,
+    threshold: threshold,
+    buildDeck: buildDeck,
+    createGame: createGame,
+    act: act,
+    view: view,
+    scoreDetail: scoreDetail,
+    currentPoints: currentPoints,
+    availablePairs: availablePairs,
+    defaultConfig: defaultConfig,
+    indexOfId: indexOfId,
+    pairName: pairName,
+    describe: describe,
+    shuffle: shuffle
+  };
+});
+</script>
+<script>/* ============================================================
+   Tide & Fold — practice opponents
+   Deterministic-ish heuristics. Runs wherever the engine runs.
+   ============================================================ */
+(function (root, factory) {
+  var api = factory(typeof require === 'function' && typeof module === 'object' ? require('./engine.js') : root.SSP);
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  root.SSPBot = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (SSP) {
+  'use strict';
+
+  var T = SSP.CARD_TYPES;
+
+  function countBy(cards, key) {
+    var m = {};
+    for (var i = 0; i < cards.length; i++) m[cards[i][key]] = (m[cards[i][key]] || 0) + 1;
+    return m;
+  }
+
+  // Rough marginal value of adding this card to my hand.
+  function cardValue(me, card) {
+    var hand = me.hand;
+    var types = countBy(hand, 'type');
+    var all = hand.concat(me.pairs.reduce(function (a, p) { return a.concat(p.cards); }, []));
+    var colors = countBy(all, 'color');
+    var t = card.type, def = T[t], v = 0;
+
+    var held = types[t] || 0;
+
+    // A card that ends the game outright is worth more the closer you are to it.
+    if (def.sweep && held + 1 >= def.sweep) {
+      return 100;
+    }
+
+    // the Hurricane is a liability we only want when we are behind
+    if (def.kind === 'hurricane') return held ? -6 : -1.5;
+
+    if (def.kind === 'mermaid') {
+      v = 9 + held * 4;
+    } else if (def.kind === 'collector') {
+      var chart = def.chart;
+      var before = chart[Math.min(held, chart.length - 1)] || 0;
+      var after = chart[Math.min(held + 1, chart.length - 1)] || 0;
+      v = (after - before) + 0.8;
+      // Stings hurt, but the second one buys a shot at the instant win, so the
+      // marginal loss is discounted by how close that gets us.
+      if (def.sweep && v < 0) {
+        var toGo = def.sweep - (held + 1);
+        if (toGo === 1) v = v * 0.35 + 2.5;
+      }
+    } else {
+      var partner = def.partner;
+      var partnerCount = t === partner ? held : (types[partner] || 0);
+      v = partnerCount > 0 ? 3.2 : 1.1;
+      if (t === 'boat' && partnerCount > 0) v += 0.6;
+      if (t === 'crab' && partnerCount > 0) v += 0.4;
+    }
+    // Colour concentration matters for mermaids and the colour bonus, but it must
+    // never talk us into picking up something that scores against us.
+    if (v > 0) v += ((colors[card.color] || 0) + (types.mermaid || 0) * 2) * 0.18;
+    return v;
+  }
+
+  function bestPair(me) {
+    var pairs = SSP.availablePairs(me.hand);
+    if (!pairs.length) return null;
+    var order = { swimmerShark: 4, boat: 3, crab: 2, fish: 1 };
+    pairs.sort(function (a, b) { return (order[b.kind] || 0) - (order[a.kind] || 0); });
+    return pairs[0];
+  }
+
+  /* One decision. Returns an action object for the engine. */
+  function decide(state, meIdx) {
+    var me = state.players[meIdx];
+    var cfg = state.config;
+
+    if (state.phase === 'action') {
+      var anyCards = state.discards.some(function (d) { return d.length; });
+      if (state.deck.length === 0 && !anyCards) return { type: 'endTurn' };
+      var best = null;
+      for (var pile = 0; pile < state.discards.length; pile++) {
+        var stack = state.discards[pile];
+        if (!stack.length) continue;
+        var top = stack[stack.length - 1];
+        var v = cardValue(me, top);
+        if (!best || v > best.v) best = { v: v, pile: pile };
+      }
+      // a blind draw of two is worth roughly an average card plus the choice
+      if (best && best.v >= 3.0) return { type: 'takeDiscard', pile: best.pile };
+      if (state.deck.length > 0) return { type: 'drawTwo' };
+      return { type: 'takeDiscard', pile: best.pile };
+    }
+
+    if (state.phase === 'keep') {
+      var a = state.drawn[0], b = state.drawn[1];
+      var va = cardValue(me, a), vb = cardValue(me, b);
+      var keepIndex = va >= vb ? 0 : 1;
+      var toss = state.drawn[1 - keepIndex];
+      // bury a good card under the deepest pile, drop junk on the shallowest
+      var wantDeep = T[toss.type].kind === 'mermaid' || cardValue(me, toss) > 3;
+      var pile = 0;
+      for (var q = 1; q < state.discards.length; q++) {
+        var better = wantDeep
+          ? state.discards[q].length > state.discards[pile].length
+          : state.discards[q].length < state.discards[pile].length;
+        if (better) pile = q;
+      }
+      return { type: 'keepCard', keepIndex: keepIndex, pile: pile };
+    }
+
+    // Choosing a pile blind: judge it by its face-up card and how deep it is.
+    if (state.phase === 'crabPile') {
+      var best = null;
+      for (var q = 0; q < state.discards.length; q++) {
+        var stack = state.discards[q];
+        if (!stack.length) continue;
+        var top = stack[stack.length - 1];
+        var score = cardValue(me, top) + (stack.length - 1) * 0.9;
+        if (!best || score > best.v) best = { v: score, pile: q };
+      }
+      return { type: 'crabPickPile', pile: best.pile };
+    }
+
+    if (state.phase === 'crab') {
+      var cards = state.discards[state.crabPile] || [];
+      var pick = null;
+      for (var i = 0; i < cards.length; i++) {
+        var val = cardValue(me, cards[i]);
+        if (!pick || val > pick.v) pick = { v: val, cardId: cards[i].id };
+      }
+      return { type: 'crabTake', pile: state.crabPile, cardId: pick.cardId };
+    }
+
+    // Trade with whoever is sitting prettiest.
+    if (state.phase === 'hurricane') {
+      var pick = null;
+      for (var hi = 0; hi < state.players.length; hi++) {
+        var o2 = state.players[hi];
+        if (o2.id === me.id) continue;
+        if (state.lastChance && state.lastChance.callerId === o2.id) continue;
+        var worth = SSP.currentPoints(o2, SSP.modsOf(state)) + o2.hand.length * 0.4;
+        if (!pick || worth > pick.v) pick = { v: worth, id: o2.id };
+      }
+      if (pick) return { type: 'hurricaneSwap', targetId: pick.id };
+    }
+
+    if (state.phase === 'shark') {
+      var target = null;
+      for (var s = 0; s < state.players.length; s++) {
+        var o = state.players[s];
+        if (o.id === me.id || !o.hand.length) continue;
+        if (state.lastChance && state.lastChance.callerId === o.id) continue; // locked
+        var weight = o.hand.length + SSP.currentPoints(o, SSP.modsOf(state)) * 0.5;
+        if (!target || weight > target.w) target = { w: weight, id: o.id };
+      }
+      return { type: 'sharkSteal', targetId: target.id };
+    }
+
+    if (state.phase === 'pair') {
+      var mods = SSP.modsOf(state);
+      var pr = bestPair(me);
+      if (pr) {
+        var anyPile = state.discards.some(function (d) { return d.length; });
+        var holdBack = pr.kind === 'crab' && !anyPile;
+        if (!holdBack) return { type: 'playPair', cardIds: [pr.cards[0].id, pr.cards[1].id] };
+      }
+
+      // the storm costs 5 points, so only unleash it to take a clearly better seat
+      var storm = me.hand.filter(function (c) { return c.type === 'hurricane'; })[0];
+      if (storm) {
+        var mineScore = SSP.currentPoints(me, mods);
+        var bestRival = -Infinity;
+        for (var hj = 0; hj < state.players.length; hj++) {
+          var r2 = state.players[hj];
+          if (r2.id === me.id) continue;
+          if (state.lastChance && state.lastChance.callerId === r2.id) continue;
+          var v2 = SSP.currentPoints(r2, mods);
+          if (v2 > bestRival) bestRival = v2;
+        }
+        if (bestRival > mineScore + 6) return { type: 'playHurricane', cardId: storm.id };
+      }
+      if (!state.lastChance) {
+        var mine = SSP.currentPoints(me, mods);
+        var need = SSP.threshold(state);
+        if (mine >= need) {
+          var bestOpp = 0;
+          for (var k = 0; k < state.players.length; k++) {
+            if (k === meIdx) continue;
+            var est = state.players[k].pairs.length + state.players[k].hand.length * 0.9;
+            if (est > bestOpp) bestOpp = est;
+          }
+          var margin = mine - bestOpp;
+          var needed = cfg.targetScore - me.total;
+          if (!mods.noLastChance && margin >= 5 && mine >= need + 3) return { type: 'declare', kind: 'last' };
+          if (mine >= need + 1 || needed <= mine || margin >= 2) return { type: 'declare', kind: 'stop' };
+        }
+      }
+      return { type: 'endTurn' };
+    }
+
+    return { type: 'endTurn' };
+  }
+
+  return { decide: decide, cardValue: cardValue };
+});
+</script>
+<script>/* ============================================================
+   Tide & Fold — original cut-paper silhouettes
+   Every icon is drawn here from scratch; nothing is traced or
+   copied from any published edition of any game.
+   ============================================================ */
+(function (root) {
+  'use strict';
+  var S = function (body) {
+    return '<svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">' +
+      '<g fill="currentColor" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">' +
+      body + '</g></svg>';
+  };
+  var hole = 'var(--card-bg)';
+
+  root.SSPIcons = {
+    crab: S(
+      '<path d="M10 46 L3 56" fill="none"/><path d="M20 50 L16 60" fill="none"/>' +
+      '<path d="M44 50 L48 60" fill="none"/><path d="M54 46 L61 56" fill="none"/>' +
+      '<ellipse cx="32" cy="38" rx="17" ry="11"/>' +
+      '<path d="M17 30 L9 22" fill="none"/><path d="M47 30 L55 22"/>' +
+      '<path d="M9 22 L2 14 L4 26 Z"/><path d="M55 22 L62 14 L60 26 Z"/>' +
+      '<circle cx="25" cy="34" r="2.6" fill="' + hole + '" stroke="none"/>' +
+      '<circle cx="39" cy="34" r="2.6" fill="' + hole + '" stroke="none"/>'
+    ),
+    boat: S(
+      '<path d="M6 40 H58 L48 56 H16 Z"/>' +
+      '<path d="M32 6 V40" fill="none"/>' +
+      '<path d="M34 10 L54 38 H34 Z"/>' +
+      '<path d="M30 20 L14 38 H30 Z"/>'
+    ),
+    fish: S(
+      '<path d="M20 32 C28 16, 50 16, 60 32 C50 48, 28 48, 20 32 Z"/>' +
+      '<path d="M20 32 L4 20 V44 Z"/>' +
+      '<circle cx="48" cy="27" r="3" fill="' + hole + '" stroke="none"/>' +
+      '<path d="M34 24 C40 30, 40 34, 34 40" fill="none" stroke-width="2.5" stroke="' + hole + '"/>'
+    ),
+    swimmer: S(
+      '<circle cx="22" cy="18" r="7.5"/>' +
+      '<path d="M12 34 C22 26, 34 28, 46 20 L56 12" fill="none" stroke-width="6"/>' +
+      '<path d="M2 46 q8 -7 16 0 t16 0 t16 0 t16 0" fill="none" stroke-width="4"/>' +
+      '<path d="M2 56 q8 -7 16 0 t16 0 t16 0 t16 0" fill="none" stroke-width="4"/>'
+    ),
+    shark: S(
+      '<path d="M14 42 C24 38, 36 24, 46 6 C50 24, 46 38, 52 42 Z"/>' +
+      '<path d="M2 50 q8 -7 16 0 t16 0 t16 0 t16 0" fill="none" stroke-width="4"/>' +
+      '<path d="M2 60 q8 -7 16 0 t16 0 t16 0 t16 0" fill="none" stroke-width="4"/>'
+    ),
+    shell: S(
+      '<path d="M32 5 C13 18, 5 38, 7 52 H57 C59 38, 51 18, 32 5 Z"/>' +
+      '<path d="M32 9 V50 M20 15 L14 50 M44 15 L50 50" fill="none" stroke-width="2.6" stroke="' + hole + '"/>' +
+      '<path d="M7 52 H57" fill="none" stroke-width="4"/>'
+    ),
+    octopus: S(
+      '<path d="M32 6 C19 6 11 17 11 30 C11 38 15 43 20 45 H44 C49 43 53 38 53 30 C53 17 45 6 32 6 Z"/>' +
+      '<path d="M16 44 q-7 8 -3 16 M25 46 q-5 8 -1 16 M39 46 q5 8 1 16 M48 44 q7 8 3 16" fill="none" stroke-width="4.5"/>' +
+      '<circle cx="24" cy="26" r="4.5" fill="' + hole + '" stroke="none"/>' +
+      '<circle cx="40" cy="26" r="4.5" fill="' + hole + '" stroke="none"/>'
+    ),
+    penguin: S(
+      '<ellipse cx="32" cy="34" rx="16" ry="23"/>' +
+      '<ellipse cx="32" cy="39" rx="9" ry="16" fill="' + hole + '" stroke="none"/>' +
+      '<circle cx="27" cy="21" r="2.4" fill="' + hole + '" stroke="none"/>' +
+      '<circle cx="37" cy="21" r="2.4" fill="' + hole + '" stroke="none"/>' +
+      '<path d="M32 25 L40 28 L32 31 Z" stroke="none"/>' +
+      '<path d="M22 55 L14 60 M42 55 L50 60" fill="none" stroke-width="4"/>'
+    ),
+    sailor: S(
+      '<circle cx="32" cy="11" r="5.5" fill="none" stroke-width="4"/>' +
+      '<path d="M32 17 V56" fill="none" stroke-width="4"/>' +
+      '<path d="M19 26 H45" fill="none" stroke-width="4"/>' +
+      '<path d="M11 38 C11 51 21 58 32 58 C43 58 53 51 53 38" fill="none" stroke-width="4"/>' +
+      '<path d="M11 38 L5 42 M53 38 L59 42" fill="none" stroke-width="4"/>'
+    ),
+    jellyfish: S(
+      '<path d="M8 36 C8 19 19 7 32 7 C45 7 56 19 56 36 C56 39 51 40 47 38 C43 36 41 35 37 36 C34 37 33 39 29 38 C25 37 23 35 19 37 C15 39 8 39 8 36 Z"/>' +
+      '<path d="M18 40 q-4 11 1 22 M27 42 q-3 11 1 20 M37 42 q3 11 -1 20 M46 40 q4 11 -1 22" fill="none" stroke-width="3.6"/>' +
+      '<circle cx="24" cy="24" r="3.4" fill="' + hole + '" stroke="none"/>' +
+      '<circle cx="40" cy="24" r="3.4" fill="' + hole + '" stroke="none"/>' +
+      '<path d="M30 15 C24 17 21 21 20 26" fill="none" stroke-width="2.4" stroke="' + hole + '"/>'
+    ),
+    bao: S(
+      '<path d="M10 40 C10 22 20 11 32 11 C44 11 54 22 54 40 C54 45 49 48 44 48 H20 C15 48 10 45 10 40 Z"/>' +
+      '<path d="M32 11 C32 20 28 26 22 30 M32 11 C32 20 36 26 42 30" fill="none" stroke-width="2.6" stroke="' + hole + '"/>' +
+      '<path d="M18 20 C22 15 27 12 32 11 M46 20 C42 15 37 12 32 11" fill="none" stroke-width="2.6" stroke="' + hole + '"/>' +
+      '<path d="M8 48 H56 C56 54 50 57 44 57 H20 C14 57 8 54 8 48 Z"/>'
+    ),
+    hurricane: S(
+      '<circle cx="32" cy="32" r="5"/>' +
+      '<path d="M32 27 C32 14 22 6 12 9 C4 11 3 21 11 24 C17 26 24 27 32 27 Z"/>' +
+      '<path d="M32 37 C32 50 42 58 52 55 C60 53 61 43 53 40 C47 38 40 37 32 37 Z"/>' +
+      '<path d="M27 32 C14 32 6 42 9 52 C11 60 21 61 24 53 C26 47 27 40 27 32 Z" opacity=".85"/>' +
+      '<path d="M37 32 C50 32 58 22 55 12 C53 4 43 3 40 11 C38 17 37 24 37 32 Z" opacity=".85"/>' +
+      '<circle cx="32" cy="32" r="2.4" fill="' + hole + '" stroke="none"/>'
+    ),
+    mermaid: S(
+      // head
+      '<circle cx="30" cy="12" r="6.5"/>' +
+      // hair sweeping back
+      '<path d="M24 8 C15 9 11 18 14 27 C16 21 19 17 24 15 Z"/>' +
+      // arms and torso
+      '<path d="M30 19 C25 21 23 26 24 31" fill="none" stroke-width="3.4"/>' +
+      '<path d="M30 19 C35 21 37 26 36 31" fill="none" stroke-width="3.4"/>' +
+      // body curving into the tail
+      '<path d="M30 18 C24 24 25 33 30 39 C34 44 35 49 32 54" fill="none" stroke-width="7"/>' +
+      // scales
+      '<path d="M27 33 h7 M27 39 h8 M29 45 h6" fill="none" stroke-width="2" stroke="' + hole + '"/>' +
+      // tail fluke
+      '<path d="M32 52 C24 62 15 60 13 52 C20 54 25 51 27 46 Z"/>' +
+      '<path d="M32 52 C40 62 49 60 51 52 C44 54 39 51 37 46 Z"/>'
+    ),
+
+    lighthouse: S(
+      '<path d="M24 22 H40 L44 52 H20 Z"/>' +
+      '<path d="M22 34 H42" fill="none" stroke-width="2.6" stroke="' + hole + '"/>' +
+      '<path d="M23 43 H41" fill="none" stroke-width="2.6" stroke="' + hole + '"/>' +
+      '<path d="M26 10 H38 V22 H26 Z"/>' +
+      '<circle cx="32" cy="16" r="3" fill="' + hole + '" stroke="none"/>' +
+      '<path d="M26 13 L12 8 M26 19 L12 24 M38 13 L52 8 M38 19 L52 24" fill="none" stroke-width="3"/>' +
+      '<path d="M14 56 H50" fill="none" stroke-width="4"/>'
+    ),
+
+    shoal: S(
+      '<path d="M14 20 C20 12 32 12 38 20 C32 28 20 28 14 20 Z"/>' +
+      '<path d="M14 20 L5 14 V26 Z"/>' +
+      '<circle cx="30" cy="18" r="1.9" fill="' + hole + '" stroke="none"/>' +
+      '<path d="M26 40 C32 32 44 32 50 40 C44 48 32 48 26 40 Z"/>' +
+      '<path d="M26 40 L17 34 V46 Z"/>' +
+      '<circle cx="42" cy="38" r="1.9" fill="' + hole + '" stroke="none"/>' +
+      '<path d="M10 52 C15 46 25 46 30 52 C25 58 15 58 10 52 Z"/>' +
+      '<path d="M10 52 L3 48 V56 Z"/>'
+    ),
+
+    colony: S(
+      '<ellipse cx="20" cy="36" rx="11" ry="16"/>' +
+      '<ellipse cx="20" cy="40" rx="6" ry="11" fill="' + hole + '" stroke="none"/>' +
+      '<circle cx="17" cy="27" r="1.9" fill="' + hole + '" stroke="none"/>' +
+      '<circle cx="24" cy="27" r="1.9" fill="' + hole + '" stroke="none"/>' +
+      '<ellipse cx="43" cy="40" rx="10" ry="14"/>' +
+      '<ellipse cx="43" cy="44" rx="5.5" ry="9.5" fill="' + hole + '" stroke="none"/>' +
+      '<circle cx="40" cy="32" r="1.8" fill="' + hole + '" stroke="none"/>' +
+      '<circle cx="47" cy="32" r="1.8" fill="' + hole + '" stroke="none"/>' +
+      '<path d="M12 54 L6 59 M28 54 L33 59 M37 55 L32 60 M50 55 L55 60" fill="none" stroke-width="3.4"/>'
+    ),
+
+    captain: S(
+      '<path d="M14 26 C14 14 22 7 32 7 C42 7 50 14 50 26 Z"/>' +
+      '<path d="M10 26 H54 V32 H10 Z"/>' +
+      '<circle cx="32" cy="18" r="4.5" fill="' + hole + '" stroke="none"/>' +
+      '<circle cx="32" cy="44" r="9"/>' +
+      '<path d="M23 58 C23 50 41 50 41 58 Z"/>' +
+      '<path d="M27 41 h10 M27 47 h10" fill="none" stroke-width="2.2" stroke="' + hole + '"/>'
+    )
+  };
+
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+</script>
+<script>/* ============================================================
+   Tide & Fold — app layer
+   Table hosting over WebRTC (PeerJS), rendering, input.
+   One player hosts; their browser is the referee.
+   ============================================================ */
+(function () {
+  'use strict';
+
+  var SSP = window.SSP, BOT = window.SSPBot, ICONS = window.SSPIcons;
+  var T = SSP.CARD_TYPES;
+
+  var RULE_TOGGLES = [
+    { key: 'stormSeason', name: 'Storm Season',
+      blurb: 'Tide conditions that bend the scoring. Shuffle them each round, or lock one and play it all game.' },
+    { key: 'pile3', name: 'Third pile',
+      blurb: 'Three discard piles instead of two. More choice every turn, and more for the Crab to search.' },
+    { key: 'openSea', name: 'Open Sea',
+      blurb: 'Collector cards sit face up in front of their owner. Mermaids and unpaired duos stay hidden.' },
+    { key: 'jellyfish', name: 'Jellyfish',
+      blurb: 'Adds three stinging cards. One costs you 3 and two cost 6 \u2014 but gather all three and you win the game outright.' },
+    { key: 'hurricane', name: 'Hurricane Season',
+      blurb: 'Adds a single Hurricane card. Play it to trade your whole hand and table with a rival \u2014 it costs you 5 points either way.' },
+    { key: 'tableLog', name: 'Table log', notableWhen: 'off',
+      blurb: 'A running record of every draw and discard, for the whole table. Switch it off and everyone plays on memory instead.' }
+  ];
+
+  var PRESETS = {
+    standard:   { threshold: null, target: null, rules: { stormSeason: false, pile3: false, openSea: false, jellyfish: false, hurricane: false, tideKey: null, tableLog: true } },
+    blitz:      { threshold: 5, target: 15,      rules: { stormSeason: false, pile3: false, openSea: false, jellyfish: false, hurricane: false, tideKey: null, tableLog: true } },
+    everything: { threshold: null, target: null, rules: { stormSeason: true, pile3: true, openSea: true, jellyfish: true, hurricane: true, tideKey: null, tableLog: true } }
+  };
+
+  /* ---------------- shared leaderboard ---------------- */
+  // A tiny Cloudflare Worker keeps ratings and a global game count. Everything
+  // here fails quietly: if it is unreachable the game plays exactly as normal.
+  var LEADERBOARD = {
+    url: 'https://tidefold-ratings.setoeugene.workers.dev',
+    token: 'tidefold00'
+  };
+
+  var BOT_NAMES = [
+    'Mango Pepsi', 'Mt Dew Trolli', 'Pineapple Sprite', 'Baja Blast Cabo', 'Sprite Tea'
+  ];
+
+  var ALPHABET = 'ACDEFGHJKMNPQRTUVWXY3479';
+  var PEER_PREFIX = 'tidefold-v1-';
+  var MAX_PLAYERS = 4;
+
+  /* ---------------- app state ---------------- */
+  var App = {
+    mode: null,          // 'host' | 'client' | 'solo'
+    name: '',
+    code: '',
+    peer: null,
+    conns: [],           // host: DataConnection[]
+    hostConn: null,      // client: DataConnection
+    seats: [],           // host: {id,name,bot,connected,connId}
+    state: null,         // host/solo: authoritative game state
+    view: null,          // everyone: my view
+    myId: null,
+    started: false,
+    selected: [],
+    rules: { stormSeason: false, pile3: false, openSea: false, jellyfish: false, hurricane: false, tideKey: null, tableLog: true },
+    lobbyNumbers: null,
+    animatedSteal: 0,
+    animatedStorm: 0,
+    readyTimer: null,
+    readyWaitOver: false,
+    readyRound: null,
+    pileWatch: null,
+    pileRound: null,
+    pairSig: undefined,
+    fxRound: null,
+    board: null,
+    boardHumansOnly: false,
+    reportedGame: false,
+    stallTimer: null,
+    stalled: false,
+    ratingChanges: null,
+    partyOpen: false,
+    partiedFor: {},
+    botTimer: null,
+    lastError: ''
+  };
+
+  /* ---------------- tiny dom helpers ---------------- */
+  function $(id) { return document.getElementById(id); }
+  function el(tag, cls, html) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (html != null) e.innerHTML = html;
+    return e;
+  }
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+    });
+  }
+  function show(id) {
+    ['screen-menu', 'screen-join', 'screen-lobby', 'screen-game'].forEach(function (s) {
+      $(s).classList.toggle('hidden', s !== id);
+    });
+    document.body.classList.toggle('in-game', id === 'screen-game');
+  }
+  var toastTimer = null;
+  function toast(msg, kind, ms) {
+    var t = $('toast');
+    t.textContent = msg;
+    t.className = 'toast' + (kind ? ' ' + kind : '');
+    t.classList.remove('hidden');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.add('hidden'); }, ms || 2600);
+  }
+
+  /* ---------------- card rendering ---------------- */
+  function cardEl(card, opts) {
+    opts = opts || {};
+    var def = T[card.type];
+    var size = opts.mini ? ' mini' : (opts.small ? ' small' : '');
+    var e = el('div', 'card' + size + (opts.cls ? ' ' + opts.cls : ''));
+    e.setAttribute('data-color', card.color);
+    e.setAttribute('data-id', card.id);
+    e.title = card.color + ' ' + def.name + (def.kind === 'duo' ? ' \u2014 ' + def.effect : '');
+    var foot = '';
+    if (def.kind === 'collector') {
+      var bits = [], started = false;
+      for (var n = 1; n < def.chart.length; n++) {
+        if (!started && def.chart[n] === 0) continue; // skip counts that score nothing yet
+        started = true;
+        bits.push(n + '\u2192' + def.chart[n]);
+      }
+      if (def.sweep) bits.push(def.sweep + '\u2192WIN');
+      foot = bits.join('  ');
+    } else if (def.kind === 'mermaid') {
+      foot = 'scores a colour';
+    } else if (def.kind === 'multiplier') {
+      foot = def.rate + ' per ' + T[def.per].name;
+    } else if (def.kind === 'hurricane') {
+      foot = 'swap everything  \u22125';
+    } else {
+      foot = def.partner === card.type ? 'pair up' : '+ ' + T[def.partner].name;
+    }
+    e.innerHTML =
+      '<span class="swatch" style="background:var(--' + card.color + ')"></span>' +
+      '<span class="name">' + esc(def.name) + '</span>' +
+      (ICONS[card.type] || '') +
+      '<span class="foot' + (def.kind === 'duo' ? ' duo' : '') + '">' + esc(foot) + '</span>';
+    return e;
+  }
+
+  /* ---------------- host: seats & networking ---------------- */
+  function makeCode() {
+    var s = '';
+    for (var i = 0; i < 4; i++) s += ALPHABET[Math.floor(Math.random() * ALPHABET.length)];
+    return s;
+  }
+
+  function ensurePeerLib(cb) {
+    if (window.Peer) return cb(null);
+    var urls = [
+      'https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js',
+      'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js',
+      'https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js'
+    ];
+    var i = 0;
+    (function next() {
+      if (i >= urls.length) return cb(new Error('Could not load the networking library. Check your connection.'));
+      var s = document.createElement('script');
+      s.src = urls[i++];
+      s.onload = function () { cb(window.Peer ? null : new Error('Networking library loaded but is unusable.')); };
+      s.onerror = next;
+      document.head.appendChild(s);
+    })();
+  }
+
+  function hostTable() {
+    App.mode = 'host';
+    App.myId = 'seat0';
+    App.seats = [{ id: 'seat0', name: App.name, bot: false, connected: true, connId: null }];
+    App.started = false;
+    setLobbyStatus('Opening the table\u2026');
+    show('screen-lobby');
+    renderLobby();
+
+    ensurePeerLib(function (err) {
+      if (err) { setLobbyStatus(err.message, true); return; }
+      tryOpen(0);
+    });
+
+    function tryOpen(attempt) {
+      if (attempt > 6) { setLobbyStatus('Could not reserve a table code. Try again.', true); return; }
+      var code = makeCode();
+      var peer = new window.Peer(PEER_PREFIX + code, { debug: 0 });
+      peer.on('open', function () {
+        App.peer = peer;
+        App.code = code;
+        setLobbyStatus('');
+        renderLobby();
+      });
+      peer.on('error', function (e) {
+        if (e && (e.type === 'unavailable-id')) { try { peer.destroy(); } catch (x) {} return tryOpen(attempt + 1); }
+        if (!App.peer) { setLobbyStatus(netMessage(e), true); }
+        else { toast(netMessage(e)); }
+      });
+      peer.on('connection', onGuest);
+      peer.on('disconnected', function () { try { peer.reconnect(); } catch (x) {} });
+    }
+  }
+
+  function netMessage(e) {
+    var t = e && e.type ? e.type : '';
+    if (t === 'peer-unavailable') return 'No table with that code is open right now.';
+    if (t === 'network' || t === 'server-error' || t === 'socket-error' || t === 'socket-closed') {
+      return 'Lost contact with the matchmaking server. Check your connection and try again.';
+    }
+    if (t === 'browser-incompatible') return 'This browser cannot make peer connections. Try Chrome, Edge, Safari or Firefox.';
+    if (t === 'webrtc') return 'The direct connection failed. A strict firewall or VPN can block this.';
+    return (e && e.message) ? e.message : 'Connection problem.';
+  }
+
+  function onGuest(conn) {
+    App.conns.push(conn);
+    conn.on('data', function (msg) { handleGuestMessage(conn, msg); });
+    conn.on('close', function () { dropConn(conn); });
+    conn.on('error', function () { dropConn(conn); });
+  }
+
+  function dropConn(conn) {
+    var i = App.conns.indexOf(conn);
+    if (i >= 0) App.conns.splice(i, 1);
+    var seat = App.seats.filter(function (s) { return s.connId === conn.peer; })[0];
+    if (!seat) { renderLobby(); return; }
+    if (!App.started) {
+      App.seats = App.seats.filter(function (s) { return s !== seat; });
+    } else {
+      seat.connected = false;
+      if (App.state) {
+        var p = App.state.players.filter(function (pl) { return pl.id === seat.id; })[0];
+        if (p) p.connected = false;
+        App.state.log.push({ text: seat.name + ' lost connection.', tone: '' });
+      }
+    }
+    pushAll();
+    renderLobby();
+  }
+
+  function handleGuestMessage(conn, msg) {
+    if (!msg || typeof msg !== 'object') return;
+
+    if (msg.t === 'hello') {
+      var wanted = String(msg.name || 'Guest').slice(0, 16).trim() || 'Guest';
+      if (App.started) {
+        var open = App.seats.filter(function (s) {
+          return !s.bot && !s.connected && s.name.toLowerCase() === wanted.toLowerCase();
+        })[0];
+        if (!open) {
+          conn.send({ t: 'denied', reason: 'The game has already started. Ask the host to start a new one, or rejoin with the exact name you used before.' });
+          return;
+        }
+        open.connected = true;
+        open.connId = conn.peer;
+        var pl = App.state.players.filter(function (p) { return p.id === open.id; })[0];
+        if (pl) pl.connected = true;
+        App.state.log.push({ text: open.name + ' reconnected.', tone: '' });
+        conn.send({ t: 'seated', id: open.id, name: open.name, code: App.code });
+        pushAll();
+        renderLobby();
+        return;
+      }
+      if (App.seats.length >= MAX_PLAYERS) {
+        // free a bot seat rather than turning a person away
+        for (var bi = App.seats.length - 1; bi >= 0; bi--) {
+          if (App.seats[bi].bot) { App.seats.splice(bi, 1); break; }
+        }
+      }
+      if (App.seats.length >= MAX_PLAYERS) {
+        conn.send({ t: 'denied', reason: 'This table is full (4 players).' });
+        return;
+      }
+      var name = wanted, k = 2;
+      while (App.seats.some(function (s) { return s.name.toLowerCase() === name.toLowerCase(); })) name = wanted + ' ' + (k++);
+      var seat = { id: 'seat' + (App.seats.length + Math.floor(Math.random() * 1000)), name: name, bot: false, connected: true, connId: conn.peer };
+      App.seats.push(seat);
+      conn.send({ t: 'seated', id: seat.id, name: seat.name, code: App.code });
+      broadcastLobby();
+      renderLobby();
+      return;
+    }
+
+    if (msg.t === 'action') {
+      var s = App.seats.filter(function (x) { return x.connId === conn.peer; })[0];
+      if (!s || !App.state) return;
+      var res = SSP.act(App.state, s.id, msg.action);
+      if (!res.ok) conn.send({ t: 'nope', error: res.error });
+      afterChange();
+    }
+  }
+
+  function broadcastLobby() {
+    var payload = {
+      t: 'lobby',
+      code: App.code,
+      rules: App.rules,
+      numbers: { threshold: $('cfg-threshold').value, target: $('cfg-target').value },
+      seats: App.seats.map(function (s) { return { id: s.id, name: s.name, bot: s.bot, connected: s.connected }; })
+    };
+    App.conns.forEach(function (c) { try { c.send(payload); } catch (e) {} });
+  }
+
+  function pushAll() {
+    if (!App.state) { broadcastLobby(); return; }
+    App.conns.forEach(function (c) {
+      var seat = App.seats.filter(function (s) { return s.connId === c.peer; })[0];
+      if (!seat) return;
+      try { c.send({ t: 'view', view: SSP.view(App.state, seat.id) }); } catch (e) {}
+    });
+    App.view = SSP.view(App.state, App.myId);
+    renderGame();
+  }
+
+  /* ---------------- guest ---------------- */
+  function joinTable(code) {
+    App.mode = 'client';
+    App.code = code;
+    setJoinStatus('Looking for table ' + code + '\u2026');
+    ensurePeerLib(function (err) {
+      if (err) { setJoinStatus(err.message, true); return; }
+      var peer = new window.Peer({ debug: 0 });
+      App.peer = peer;
+      var settled = false;
+      peer.on('open', function () {
+        var conn = peer.connect(PEER_PREFIX + code, { reliable: true });
+        App.hostConn = conn;
+        conn.on('open', function () { conn.send({ t: 'hello', name: App.name }); });
+        conn.on('data', function (m) { settled = true; handleHostMessage(m); });
+        conn.on('close', function () {
+          if (App.started) { toast('The host closed the table.'); }
+          setJoinStatus('The connection to the table closed.', true);
+          show('screen-join');
+        });
+        conn.on('error', function (e) { setJoinStatus(netMessage(e), true); });
+        setTimeout(function () {
+          if (!settled) setJoinStatus('Still trying to reach table ' + code + '. Make sure the host has the page open.', true);
+        }, 9000);
+      });
+      peer.on('error', function (e) { setJoinStatus(netMessage(e), true); });
+    });
+  }
+
+  var handleHostMessage = function (m) {
+    if (!m || typeof m !== 'object') return;
+    if (m.t === 'denied') { setJoinStatus(m.reason, true); show('screen-join'); return; }
+    if (m.t === 'seated') {
+      App.myId = m.id;
+      App.name = m.name;
+      setLobbyStatus('');
+      show('screen-lobby');
+      renderLobby();
+      return;
+    }
+    if (m.t === 'lobby') {
+      App.code = m.code;
+      App.seats = m.seats;
+      if (m.rules) App.rules = m.rules;
+      if (m.numbers) App.lobbyNumbers = m.numbers;
+      if (!App.started) { show('screen-lobby'); renderLobby(); }
+      return;
+    }
+    if (m.t === 'view') {
+      App.view = m.view;
+      App.started = true;
+      show('screen-game');
+      renderGame();
+      return;
+    }
+    if (m.t === 'nope') { toast(m.error); return; }
+  };
+
+  /* ---------------- starting a game ---------------- */
+  function startGame() {
+    var defs = App.seats.map(function (s) { return { id: s.id, name: s.name, bot: s.bot, connected: s.connected }; });
+    if (defs.length < 2) { toast('You need at least two players.'); return; }
+    App.state = SSP.createGame(defs, readSettings());
+    App.started = true;
+    afterChange();
+    show('screen-game');
+  }
+
+  function readSettings() {
+    var out = {
+      pileCount: App.rules.pile3 ? 3 : 2,
+      openSea: !!App.rules.openSea,
+      jellyfish: !!App.rules.jellyfish,
+      hurricane: !!App.rules.hurricane,
+      stormSeason: !!App.rules.stormSeason,
+      tideKey: App.rules.stormSeason ? (App.rules.tideKey || null) : null,
+      tableLog: App.rules.tableLog !== false
+    };
+    if ($('cfg-threshold').dataset.touched) {
+      var th = parseInt($('cfg-threshold').value, 10);
+      if (!isNaN(th) && th > 0) out.stopThreshold = th;
+    }
+    if ($('cfg-target').dataset.touched) {
+      var tg = parseInt($('cfg-target').value, 10);
+      if (!isNaN(tg) && tg > 0) out.targetScore = tg;
+    }
+    return out;
+  }
+
+  // Solo play goes through the same lobby so house rules can be set first.
+  function soloLobby(botCount) {
+    App.mode = 'solo';
+    App.myId = 'seat0';
+    App.seats = [{ id: 'seat0', name: App.name || 'You', bot: false, connected: true }];
+    // a different line-up each time, never the same name twice at one table
+    var names = SSP.shuffle(BOT_NAMES.slice());
+    for (var i = 0; i < botCount; i++) {
+      App.seats.push({ id: 'bot' + i, name: names[i], bot: true, connected: true });
+    }
+    setLobbyStatus('');
+    show('screen-lobby');
+    renderLobby();
+  }
+
+  /* ---------------- host loop ---------------- */
+  function afterChange() {
+    if (!App.state) return;
+    clearTimeout(App.stallTimer);
+    App.view = SSP.view(App.state, App.myId);
+    pushAll();
+    scheduleBot();
+  }
+
+  /* A legal move for whatever phase the game is in. Used to rescue a bot whose
+     own decision failed, and to play a seat for someone who has dropped out. */
+  function safeAction(state) {
+    var p = state.players[state.turn];
+    switch (state.phase) {
+      case 'action':
+        if (state.deck.length) return { type: 'drawTwo' };
+        for (var i = 0; i < state.discards.length; i++) {
+          if (state.discards[i].length) return { type: 'takeDiscard', pile: i };
+        }
+        return { type: 'endTurn' };
+      case 'keep':
+        return { type: 'keepCard', keepIndex: 0, pile: 0 };
+      case 'crabPile':
+        for (var c = 0; c < state.discards.length; c++) {
+          if (state.discards[c].length) return { type: 'crabPickPile', pile: c };
+        }
+        return { type: 'endTurn' };
+      case 'crab':
+        var pile = state.discards[state.crabPile] || [];
+        if (pile.length) return { type: 'crabTake', pile: state.crabPile, cardId: pile[0].id };
+        return { type: 'endTurn' };
+      case 'shark':
+        for (var t = 0; t < state.players.length; t++) {
+          var o = state.players[t];
+          if (o.id === p.id || !o.hand.length) continue;
+          if (state.lastChance && state.lastChance.callerId === o.id) continue;
+          return { type: 'sharkSteal', targetId: o.id, cardIndex: 0 };
+        }
+        return { type: 'endTurn' };
+      case 'hurricane':
+        for (var h = 0; h < state.players.length; h++) {
+          var q = state.players[h];
+          if (q.id === p.id) continue;
+          if (state.lastChance && state.lastChance.callerId === q.id) continue;
+          return { type: 'hurricaneSwap', targetId: q.id };
+        }
+        return { type: 'endTurn' };
+      default:
+        return { type: 'endTurn' };
+    }
+  }
+
+  function scheduleBot() {
+    clearTimeout(App.botTimer);
+    var s = App.state;
+    if (!s || s.phase === 'gameEnd') return;
+    if (s.phase === 'roundEnd') return;
+    var cur = s.players[s.turn];
+    if (!cur || !cur.bot) return;
+    App.botTimer = setTimeout(function () {
+      if (!App.state || App.state.players[App.state.turn] !== cur) return;
+      var res;
+      try {
+        res = SSP.act(App.state, cur.id, BOT.decide(App.state, App.state.turn));
+      } catch (e) {
+        res = { ok: false, error: String(e && e.message) };
+      }
+      if (!res.ok) {
+        // never leave the table stuck: play something legal for this phase
+        for (var tries = 0; tries < 4 && !res.ok; tries++) {
+          try { res = SSP.act(App.state, cur.id, safeAction(App.state)); } catch (e2) { break; }
+        }
+      }
+      afterChange();
+    }, typeof window.TF_BOT_DELAY === 'number' ? window.TF_BOT_DELAY : (620 + Math.random() * 420));
+
+    // Backstop: if the game has not moved on at all after five seconds, offer a
+    // button. Judged on the state version, so a bot failing repeatedly still counts.
+    clearTimeout(App.stallTimer);
+    var mark = App.state.version;
+    App.stallTimer = setTimeout(function () {
+      if (!App.state || App.state.version !== mark) return;
+      if (!App.state.players[App.state.turn] || !App.state.players[App.state.turn].bot) return;
+      App.stalled = true;
+      if (App.view) renderGame();
+    }, 5000);
+  }
+
+  function autoPlayStuckSeat() {
+    if (!App.state) return;
+    var p = App.state.players[App.state.turn];
+    var res;
+    try { res = SSP.act(App.state, p.id, BOT.decide(App.state, App.state.turn)); }
+    catch (e) { res = { ok: false }; }
+    for (var tries = 0; tries < 6 && !res.ok; tries++) {
+      try { res = SSP.act(App.state, p.id, safeAction(App.state)); } catch (e2) { break; }
+    }
+    App.stalled = false;
+    afterChange();
+  }
+
+  /* ---------------- sending actions ---------------- */
+  function send(action) {
+    if (App.mode === 'client') {
+      if (!App.hostConn || !App.hostConn.open) { toast('Not connected to the table.'); return; }
+      App.hostConn.send({ t: 'action', action: action });
+      return;
+    }
+    if (!App.state) return;
+    var res = SSP.act(App.state, App.myId, action);
+    if (!res.ok) { toast(res.error); return; }
+    afterChange();
+  }
+
+  /* ---------------- lobby rendering ---------------- */
+  function setLobbyStatus(msg, bad) {
+    var n = $('lobby-status');
+    n.textContent = msg || '';
+    n.className = 'notice' + (bad ? ' bad' : '');
+    n.classList.toggle('hidden', !msg);
+  }
+  function setJoinStatus(msg, bad) {
+    var n = $('join-status');
+    n.textContent = msg || '';
+    n.className = 'notice' + (bad ? ' bad' : '');
+    n.classList.toggle('hidden', !msg);
+  }
+
+  function renderLobby() {
+    var isHost = App.mode === 'host' || App.mode === 'solo';
+    var solo = App.mode === 'solo';
+    $('lobby-tablepanel').classList.toggle('hidden', solo);
+    $('lobby-code').textContent = App.code || '\u2022\u2022\u2022\u2022';
+    $('lobby-seats').innerHTML = '';
+    App.seats.forEach(function (s, i) {
+      var row = el('div', 'seat');
+      row.innerHTML =
+        '<span class="dot' + (s.connected ? '' : ' off') + '"></span>' +
+        '<b>' + esc(s.name) + '</b>' +
+        '<span class="role">' + (i === 0 ? 'host' : (s.bot ? 'practice bot' : 'player')) + '</span>';
+      $('lobby-seats').appendChild(row);
+    });
+    // Bots can fill a seat at an online table too, not just in solo practice.
+    $('lobby-botbits').classList.toggle('hidden', !isHost);
+    $('btn-addbot').disabled = App.seats.length >= MAX_PLAYERS;
+    $('btn-dropbot').disabled = !App.seats.some(function (x) { return x.bot; });
+    $('lobby-hostbits').classList.toggle('hidden', !isHost);
+    $('lobby-hostbits2').classList.toggle('hidden', !isHost);
+    $('lobby-rulesview').classList.toggle('hidden', isHost);
+    $('lobby-guestbits').classList.toggle('hidden', isHost);
+    $('rules-sub').textContent = isHost
+      ? 'Everything is off by default. Whatever you switch on, the whole table plays.'
+      : 'The host sets these for the table.';
+    if (isHost) renderToggles(); else renderRulesView();
+    checkForEster(App.seats);
+    $('btn-start').disabled = !isHost || App.seats.length < 2;
+    var n = App.seats.length || 2;
+    var d = SSP.defaultConfig(n);
+    if (!$('cfg-threshold').dataset.touched) $('cfg-threshold').value = d.stopThreshold;
+    if (!$('cfg-target').dataset.touched) $('cfg-target').value = d.targetScore;
+  }
+
+  function renderToggles() {
+    var box = $('cfg-toggles');
+    box.innerHTML = '';
+    RULE_TOGGLES.forEach(function (r) {
+      var b = el('button', 'toggle');
+      b.type = 'button';
+      b.setAttribute('aria-pressed', App.rules[r.key] ? 'true' : 'false');
+      b.innerHTML = '<span class="box"></span><span class="txt"><b>' + esc(r.name) + '</b><span>' + esc(r.blurb) + '</span></span>';
+      b.onclick = function () {
+        App.rules[r.key] = !App.rules[r.key];
+        if (r.key === 'jellyfish' && !App.rules.jellyfish && App.rules.tideKey === 'bloom') App.rules.tideKey = null;
+        renderToggles();
+        broadcastLobby();
+      };
+      box.appendChild(b);
+      if (r.key === 'stormSeason' && App.rules.stormSeason) box.appendChild(tidePicker());
+    });
+  }
+
+  // Storm Season can shuffle the conditions, or run any single one every round.
+  // Each option carries its own description so nothing is hidden behind a tooltip.
+  function tideOptions() {
+    return [{
+      key: null,
+      name: 'Shuffle each round',
+      blurb: 'A different condition every round, drawn at random and never the same twice running.'
+    }].concat(SSP.tidePool({ jellyfish: !!App.rules.jellyfish }).map(function (t) {
+      return { key: t.key, name: t.name, blurb: t.blurb };
+    }));
+  }
+
+  function tidePicker() {
+    var wrap = el('div', 'tideopts');
+    wrap.setAttribute('role', 'radiogroup');
+    wrap.setAttribute('aria-label', 'Tide conditions');
+    tideOptions().forEach(function (t) {
+      var chosen = (App.rules.tideKey || null) === (t.key || null);
+      var b = el('button', 'tideopt' + (chosen ? ' sel' : ''));
+      b.type = 'button';
+      b.setAttribute('role', 'radio');
+      b.setAttribute('data-tide', t.key || '');
+      b.setAttribute('aria-checked', chosen ? 'true' : 'false');
+      b.setAttribute('aria-pressed', chosen ? 'true' : 'false');
+      b.innerHTML = '<span class="dot"></span><span class="txt"><b>' + esc(t.name) + '</b>' +
+        '<span>' + esc(t.blurb) + '</span></span>';
+      b.onclick = function () {
+        App.rules.tideKey = t.key || null;
+        renderToggles();
+        broadcastLobby();
+      };
+      wrap.appendChild(b);
+    });
+    return wrap;
+  }
+
+  function renderRulesView() {
+    var box = $('lobby-rulesview');
+    box.innerHTML = '';
+    var list = el('div', 'ruleslist');
+    var nums = App.lobbyNumbers || {};
+    list.appendChild(el('div', '', '<b>Declare from</b> ' + esc(nums.threshold || '7') + ' points'));
+    list.appendChild(el('div', '', '<b>Game ends at</b> ' + esc(nums.target || '40') + ' points'));
+    RULE_TOGGLES.forEach(function (r) {
+      var on = !!App.rules[r.key];
+      var extra = '';
+      if (r.key === 'tableLog') {
+        list.appendChild(el('div', on ? '' : 'off', '<b>Table log</b> ' + (on ? 'on' : 'off \u2014 play on memory')));
+        return;
+      }
+      if (r.key === 'stormSeason' && on) {
+        var fixed = App.rules.tideKey ? SSP.tideByKey({ jellyfish: !!App.rules.jellyfish }, App.rules.tideKey) : null;
+        extra = fixed
+          ? ' \u2014 ' + esc(fixed.name) + ' every round: ' + esc(fixed.blurb)
+          : ' \u2014 a different condition each round';
+      }
+      list.appendChild(el('div', on ? '' : 'off', '<b>' + esc(r.name) + '</b> ' + (on ? 'on' : 'off') + extra));
+    });
+    box.appendChild(list);
+  }
+
+  function applyPreset(name) {
+    var pre = PRESETS[name];
+    if (!pre) return;
+    for (var k in pre.rules) App.rules[k] = pre.rules[k];
+    ['cfg-threshold', 'cfg-target'].forEach(function (id) { delete $(id).dataset.touched; });
+    if (pre.threshold != null) { $('cfg-threshold').value = pre.threshold; $('cfg-threshold').dataset.touched = '1'; }
+    if (pre.target != null) { $('cfg-target').value = pre.target; $('cfg-target').dataset.touched = '1'; }
+    renderLobby();
+    broadcastLobby();
+  }
+
+  /* ---------------- game rendering ---------------- */
+  function renderGame() {
+    var V = App.view;
+    if (!V) return;
+    show('screen-game');
+    var snap = snapshotRects();
+
+    if (!(V.yourTurn && V.phase === 'keep')) keepChoice = null;
+    if (!(V.yourTurn && V.phase === 'pair' && !V.pairPlayed)) App.selected = [];
+    var me = V.players.filter(function (p) { return p.isYou; })[0];
+    var cur = V.players.filter(function (p) { return p.id === V.turnId; })[0];
+
+    /* rail */
+    var rail = $('rail');
+    rail.innerHTML = '';
+    rail.appendChild(stat('Your points', V.you ? V.you.points : 0, true));
+    rail.appendChild(stat('Declare at', V.threshold, V.threshold !== V.config.stopThreshold));
+    rail.appendChild(stat('Game to', V.config.targetScore));
+    if (me) rail.appendChild(stat('Your total', me.total, true));
+
+    /* banner */
+    var banner = $('banner');
+    banner.className = 'banner';
+    var text;
+    if (V.phase === 'gameEnd') { text = 'Game over.'; banner.classList.add('waiting'); }
+    else if (V.phase === 'roundEnd') { text = 'Round ' + V.roundNo + ' scored.'; banner.classList.add('waiting'); }
+    else if (V.lastChance) {
+      var caller = V.players.filter(function (p) { return p.id === V.lastChance.callerId; })[0];
+      banner.classList.add('alarm');
+      text = 'Last Chance called by ' + (caller ? caller.name : '?') + ' \u2014 ' +
+        V.lastChance.turnsLeft + ' turn' + (V.lastChance.turnsLeft === 1 ? '' : 's') + ' left. ' +
+        (V.yourTurn ? 'Your final turn.' : 'Waiting for ' + (cur ? cur.name : '?') + '.');
+    } else if (V.yourTurn) { text = 'Your turn.'; }
+    else { banner.classList.add('waiting'); text = 'Waiting for ' + (cur ? cur.name : '\u2026') + '.'; }
+    banner.innerHTML = '<span class="pulse"></span><span>' + esc(text) + '</span>';
+
+    /* tide */
+    var tide = $('tide');
+    if (V.tide) {
+      tide.classList.remove('hidden');
+      tide.innerHTML = '<span class="chip">Tide</span><b>' + esc(V.tide.name) + '</b><span>' + esc(V.tide.blurb) + '</span>';
+    } else {
+      tide.classList.add('hidden');
+      tide.innerHTML = '';
+    }
+
+    /* opponents */
+    var opps = $('opps');
+    opps.innerHTML = '';
+    V.players.forEach(function (p) {
+      if (p.isYou) return;
+      var box = el('div', 'opp' + (p.id === V.turnId ? ' active' : '') + (p.connected ? '' : ' gone'));
+      box.setAttribute('data-player', p.id);
+      var head = el('div', 'head');
+      head.innerHTML = '<span>' + esc(p.name) + '</span>' +
+        (p.bot ? '<span class="badge">bot</span>' : '') +
+        (p.connected ? '' : '<span class="badge">offline</span>') +
+        '<span class="score">' + p.total + '</span>';
+      box.appendChild(head);
+      var meta = p.handCount + ' in hand';
+      if (p.revealed && p.revealed.length) meta += ' (' + p.hiddenCount + ' hidden)';
+      meta += ' \u00b7 ' + p.pairs.length + ' pair' + (p.pairs.length === 1 ? '' : 's') + ' down';
+      box.appendChild(el('div', 'meta', meta));
+      var backs = el('div', 'backs');
+      for (var i = 0; i < p.handCount; i++) backs.appendChild(el('span', 'back'));
+      box.appendChild(backs);
+      // What a rival has played is the main thing you read off their panel, so the
+      // pairs are shown at a size you can actually identify across the table.
+      if ((p.revealed && p.revealed.length) || p.pairs.length || (p.hurricanes || []).length) {
+        var strip = el('div', 'pairstrip');
+        (p.revealed || []).forEach(function (c) {
+          var node = cardEl(c, { small: true, cls: 'faceup' });
+          node.title = 'Face up: ' + c.color + ' ' + T[c.type].name;
+          strip.appendChild(node);
+        });
+        if ((p.revealed || []).length && p.pairs.length) strip.appendChild(el('span', 'divider'));
+        p.pairs.forEach(function (pr) {
+          var g = el('div', 'pairgrp small');
+          g.title = SSP.pairName(pr.kind);
+          pr.cards.forEach(function (c) { g.appendChild(cardEl(c, { small: true })); });
+          strip.appendChild(g);
+        });
+        (p.hurricanes || []).forEach(function (c) {
+          var node = cardEl(c, { small: true, cls: 'faceup' });
+          node.title = 'Hurricane played \u2014 costs them 5';
+          strip.appendChild(node);
+        });
+        box.appendChild(strip);
+      }
+      opps.appendChild(box);
+    });
+
+    renderTable(V);
+
+    /* my pairs */
+    var mypairs = $('mypairs');
+    mypairs.innerHTML = '';
+    if (V.you && (V.you.pairs.length || (V.you.hurricanes || []).length)) {
+      V.you.pairs.forEach(function (pr) {
+        var g = el('div', 'pairgrp small');
+        pr.cards.forEach(function (c) { g.appendChild(cardEl(c, { small: true })); });
+        g.title = SSP.pairName(pr.kind);
+        mypairs.appendChild(g);
+      });
+      (V.you.hurricanes || []).forEach(function (c) {
+        var node = cardEl(c, { small: true });
+        node.title = 'Hurricane played \u2014 costs you 5';
+        mypairs.appendChild(node);
+      });
+      $('mypairs-head').classList.remove('hidden');
+    } else {
+      $('mypairs-head').classList.add('hidden');
+    }
+
+    /* my hand */
+    var hand = $('hand');
+    hand.innerHTML = '';
+    var ids = V.you ? V.you.hand.map(function (c) { return c.id; }) : [];
+    App.selected = App.selected.filter(function (id) { return ids.indexOf(id) >= 0; });
+    var selectable = V.yourTurn && V.phase === 'pair' && !V.pairPlayed;
+
+    // Which cards could form a duo? Worked out across the whole hand, so every
+    // copy lights up — with three Crabs, all three are eligible, not just two.
+    var live = {};
+    if (selectable && V.you) {
+      var counts = {};
+      V.you.hand.forEach(function (c) {
+        if (T[c.type].kind === 'duo') counts[c.type] = (counts[c.type] || 0) + 1;
+      });
+      V.you.hand.forEach(function (c) {
+        var def = T[c.type];
+        if (def.kind !== 'duo') return;
+        var partner = def.partner;
+        var available = partner === c.type ? (counts[c.type] || 0) - 1 : (counts[partner] || 0);
+        if (available > 0) live[c.id] = true;
+      });
+
+      if (App.selected.length === 1) {
+        var pickedId = App.selected[0];
+        var pickedCard = V.you.hand.filter(function (c) { return c.id === pickedId; })[0];
+        var partners = {};
+        if (pickedCard && T[pickedCard.type].kind === 'duo') {
+          var wanted = T[pickedCard.type].partner;
+          V.you.hand.forEach(function (c) {
+            if (c.id !== pickedId && c.type === wanted) partners[c.id] = true;
+          });
+        }
+        live = partners;
+        live[pickedId] = true;
+      }
+    }
+
+    if (V.you) {
+      V.you.hand.forEach(function (c) {
+        var isSel = App.selected.indexOf(c.id) >= 0;
+        var eligible = !!live[c.id];
+        var cls = '';
+        if (selectable) cls += 'pick ';
+        if (isSel) cls += 'sel ';
+        else if (selectable && eligible) cls += 'live ';
+        else if (selectable) cls += 'faded ';
+        var node = cardEl(c, { cls: cls.trim() });
+        if (selectable) node.onclick = function () { toggleSelect(c.id); };
+        hand.appendChild(node);
+      });
+    }
+    $('hand-pts').textContent = (V.you ? V.you.points : 0) + ' pts if the round ended now';
+
+    renderActions(V);
+    $('logbox').classList.toggle('hidden', V.config.tableLog === false);
+    renderLog(V);
+    renderOverlay(V);
+
+    announcePiles(V, snap);
+    announcePairs(V, snap);
+
+    if (V.storm && V.storm.seq !== App.animatedStorm) {
+      App.animatedStorm = V.storm.seq;
+      var by = V.players.filter(function (p) { return p.id === V.storm.byId; })[0];
+      var wi = V.players.filter(function (p) { return p.id === V.storm.withId; })[0];
+      toast(by && by.isYou ? 'You swapped everything with ' + (wi ? wi.name : 'someone') + '.'
+           : wi && wi.isYou ? (by ? by.name : 'Someone') + ' swapped everything with you!'
+           : (by ? by.name : 'Someone') + ' swapped everything with ' + (wi ? wi.name : 'someone') + '.',
+           'info', 7000);
+      showStorm(V.storm.card, by ? by.name : '?', wi ? wi.name : '?');
+    }
+
+    if (V.steal && V.steal.seq !== App.animatedSteal) {
+      App.animatedSteal = V.steal.seq;
+      playSteal(V, snap);
+    }
+  }
+
+  /* ---------------- duos, announced ---------------- */
+
+  var PAIR_FX = {
+    crab:         { verb: 'goes rummaging', note: 'Pick a pile, then take a card from it.' },
+    boat:         { verb: 'sails on', note: 'Another turn, straight away.' },
+    fish:         { verb: 'hauls one in', note: 'A card off the top of the deck.' },
+    swimmerShark: { verb: 'strikes', note: 'A card taken from a rival hand.' }
+  };
+
+  function pairSignature(V) {
+    return V.players.map(function (p) {
+      return p.id + ':' + p.pairs.map(function (pr) { return pr.kind; }).join('+');
+    }).join('|');
+  }
+
+  function clearEffects() {
+    [].forEach.call(document.querySelectorAll('.pairfx, .flying, .lostcard'), function (n) {
+      if (n.parentNode) n.parentNode.removeChild(n);
+    });
+  }
+
+  /* Watching someone else's turn, the only visible change is a pile top swapping
+     over — far too quick to read. Each pile is now labelled with what just happened
+     and the card is held for a few seconds. */
+  function pileState(V) {
+    return V.discardTops.map(function (t, i) {
+      return { id: t ? t.id : null, count: V.discardCounts[i], card: t };
+    });
+  }
+
+  function announcePiles(V, snap) {
+    var now = pileState(V);
+    var before = App.pileWatch;
+    App.pileWatch = now;
+    if (!before || before.length !== now.length) return;
+    if (V.roundNo !== App.pileRound) { App.pileRound = V.roundNo; return; }
+    if (V.yourTurn && V.phase !== 'action') return; // your own moves are already obvious
+
+    for (var i = 0; i < now.length; i++) {
+      var was = before[i], is = now[i];
+      if (was.count === is.count && was.id === is.id) continue;
+      if (is.count > was.count && is.card) markPile(i, 'placed', is.card);
+      else if (is.count < was.count) markPile(i, 'taken', was.card);
+    }
+  }
+
+  function markPile(index, kind, card) {
+    var slots = document.querySelectorAll('#table .tablerow .slot');
+    var slot = slots[index + 1]; // slot 0 is the deck
+    if (!slot) return;
+    slot.classList.add('moved', kind);
+    var tag = el('div', 'movetag ' + kind, kind === 'placed' ? 'just discarded' : 'just taken');
+    slot.appendChild(tag);
+    if (kind === 'taken' && card) {
+      var ghost = cardEl(card, { cls: 'takenghost' });
+      slot.insertBefore(ghost, slot.firstChild);
+      setTimeout(function () { if (ghost.parentNode) ghost.parentNode.removeChild(ghost); }, 2600);
+    }
+    setTimeout(function () {
+      slot.classList.remove('moved', kind);
+      if (tag.parentNode) tag.parentNode.removeChild(tag);
+    }, 2600);
+  }
+
+  function announcePairs(V, snap) {
+    if (V.phase !== 'gameEnd') App.reportedGame = false;
+    if (App.fxRound !== V.roundNo) {
+      App.fxRound = V.roundNo;
+      App.pairSig = pairSignature(V);
+      clearEffects();
+      return;
+    }
+    var sig = pairSignature(V);
+    if (App.pairSig === undefined) { App.pairSig = sig; return; }
+    if (sig === App.pairSig) return;
+    var before = App.pairSig;
+    App.pairSig = sig;
+
+    // find whose pair list grew, and what they played
+    var prevCounts = {};
+    before.split('|').forEach(function (chunk) {
+      var bits = chunk.split(':');
+      prevCounts[bits[0]] = bits[1] ? bits[1].split('+').filter(Boolean).length : 0;
+    });
+    V.players.forEach(function (p) {
+      var had = prevCounts[p.id];
+      if (had == null || p.pairs.length <= had) return;
+      var pr = p.pairs[p.pairs.length - 1];
+      showPairPlayed(V, p, pr, snap);
+    });
+  }
+
+  function showPairPlayed(V, player, pr, snap) {
+    var fx = PAIR_FX[pr.kind] || { verb: 'plays a pair', note: '' };
+    var mine = player.isYou;
+    var banner = el('div', 'pairfx');
+    banner.innerHTML =
+      '<div class="cards"></div>' +
+      '<div class="say"><b>' + esc(SSP.pairName(pr.kind)) + '</b>' +
+      '<span>' + esc((mine ? 'You ' : player.name + ' ') + fx.verb) + '. ' + esc(fx.note) + '</span></div>';
+    var holder = banner.querySelector('.cards');
+    pr.cards.forEach(function (c) { holder.appendChild(cardEl(c, { small: true })); });
+    document.body.appendChild(banner);
+    // force the entry transition
+    banner.getBoundingClientRect();
+    banner.classList.add('in');
+    setTimeout(function () { banner.classList.remove('in'); banner.classList.add('out'); }, 1500);
+    setTimeout(function () { if (banner.parentNode) banner.parentNode.removeChild(banner); }, 2100);
+
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce) return;
+
+    // and a card flying the way the effect actually moves things
+    var panel = mine ? rectOf($('hand')) : (snap.panels[player.id] || rectOf($('opps')));
+    var deck = rectOf(document.querySelector('#table .deckback'));
+    var table = rectOf($('table'));
+    if (pr.kind === 'fish' && deck && panel) {
+      flyCard(null, deck, panel, {});
+    } else if (pr.kind === 'crab' && table && panel) {
+      flyCard(null, table, panel, {});
+    } else if (pr.kind === 'boat' && panel) {
+      pulse(mine ? $('actionbar') : null);
+    }
+  }
+
+  // A card taken from you is shown large for a few seconds, so there is no chance
+  // of missing what went.
+  function showLostCard(card, thiefName) {
+    var old = document.querySelector('.lostcard');
+    if (old && old.parentNode) old.parentNode.removeChild(old);
+    var box = el('div', 'lostcard');
+    box.innerHTML = '<div class="lab">' + esc(thiefName) + ' took</div>';
+    box.appendChild(cardEl(card));
+    document.body.appendChild(box);
+    box.getBoundingClientRect();
+    box.classList.add('in');
+    setTimeout(function () { box.classList.remove('in'); box.classList.add('out'); }, 6400);
+    setTimeout(function () { if (box.parentNode) box.parentNode.removeChild(box); }, 7200);
+  }
+
+  function showStorm(card, byName, withName) {
+    var old = document.querySelector('.lostcard');
+    if (old && old.parentNode) old.parentNode.removeChild(old);
+    var box = el('div', 'lostcard storm');
+    box.innerHTML = '<div class="lab">' + esc(byName) + ' \u2194 ' + esc(withName) + '</div>';
+    box.appendChild(cardEl(card));
+    box.appendChild(el('div', 'note', 'Hands and tables traded'));
+    document.body.appendChild(box);
+    box.getBoundingClientRect();
+    box.classList.add('in');
+    setTimeout(function () { box.classList.remove('in'); box.classList.add('out'); }, 5200);
+    setTimeout(function () { if (box.parentNode) box.parentNode.removeChild(box); }, 6000);
+  }
+
+  function pulse(node) {
+    if (!node) return;
+    node.classList.remove('pulsefx');
+    node.getBoundingClientRect();
+    node.classList.add('pulsefx');
+    setTimeout(function () { node.classList.remove('pulsefx'); }, 900);
+  }
+
+  /* ---------------- the steal, animated ---------------- */
+
+  function snapshotRects() {
+    var snap = { cards: {}, steals: {}, panels: {}, hand: null };
+    var hand = $('hand');
+    if (hand) {
+      snap.hand = hand.getBoundingClientRect();
+      [].forEach.call(hand.querySelectorAll('[data-id]'), function (n) {
+        snap.cards[n.getAttribute('data-id')] = n.getBoundingClientRect();
+      });
+    }
+    [].forEach.call(document.querySelectorAll('#table [data-steal]'), function (n) {
+      snap.steals[n.getAttribute('data-steal')] = n.getBoundingClientRect();
+    });
+    [].forEach.call(document.querySelectorAll('#opps [data-player]'), function (n) {
+      snap.panels[n.getAttribute('data-player')] = n.getBoundingClientRect();
+    });
+    return snap;
+  }
+
+  function rectOf(node) { return node ? node.getBoundingClientRect() : null; }
+
+  function flyCard(card, from, to, opts) {
+    if (!from || !to) return;
+    opts = opts || {};
+    var ghost = card ? cardEl(card) : el('div', 'deckback');
+    ghost.classList.add('flying');
+    document.body.appendChild(ghost);
+    var w = ghost.offsetWidth || 84, h = ghost.offsetHeight || 118;
+    var startScale = Math.max(0.28, Math.min(1, from.width / w));
+    var fx = from.left + from.width / 2 - w / 2;
+    var fy = from.top + from.height / 2 - h / 2;
+    var tx = to.left + to.width / 2 - w / 2;
+    var ty = to.top + to.height / 2 - h / 2;
+    ghost.style.transform = 'translate(' + fx + 'px,' + fy + 'px) scale(' + startScale + ') rotate(-9deg)';
+    ghost.getBoundingClientRect(); // force the start position to stick
+    ghost.style.transition = 'transform 640ms cubic-bezier(.2,.75,.3,1), opacity 320ms ease 400ms';
+    ghost.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(1) rotate(0deg)';
+    if (opts.fade) ghost.style.opacity = '0';
+    setTimeout(function () { if (ghost.parentNode) ghost.parentNode.removeChild(ghost); }, 1050);
+  }
+
+  function playSteal(V, snap) {
+    var s = V.steal;
+    var meId = V.you ? V.you.id : null;
+    var thief = s.toId === meId, victim = s.fromId === meId;
+    function who(id) {
+      var p = V.players.filter(function (x) { return x.id === id; })[0];
+      return p ? p.name : 'Someone';
+    }
+
+    if (thief && s.card) {
+      toast('You took the ' + s.card.color + ' ' + T[s.card.type].name + ' from ' + who(s.fromId) + '.', 'info', 5000);
+    } else if (victim && s.card) {
+      // the victim gets the card held on screen as well, since it just left their hand
+      toast(who(s.toId) + ' took your ' + s.card.color + ' ' + T[s.card.type].name + '.', 'info', 8000);
+      showLostCard(s.card, who(s.toId));
+    }
+
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce) return;
+
+    var from, to, face;
+    if (thief) {
+      from = snap.steals[s.fromId + ':' + s.index] || snap.panels[s.fromId];
+      var landed = s.card ? $('hand').querySelector('[data-id="' + s.card.id + '"]') : null;
+      to = rectOf(landed) || rectOf($('hand'));
+      face = s.card;
+    } else if (victim) {
+      from = (s.card && snap.cards[s.card.id]) || snap.hand;
+      to = snap.panels[s.toId] || rectOf($('opps'));
+      face = s.card;
+    } else {
+      from = snap.panels[s.fromId];
+      to = snap.panels[s.toId];
+      face = null;
+    }
+    flyCard(face, from, to, { fade: !thief });
+  }
+
+  /* The board never gets covered mid-turn: drawing two, the Crab search and the
+     Shark steal all resolve in place, so your hand stays visible throughout. */
+  function renderTable(V) {
+    var table = $('table');
+    table.innerHTML = '';
+    var canAct = V.yourTurn && V.phase === 'action';
+    var keeping = V.yourTurn && V.phase === 'keep' && V.drawn;
+    var choosingPile = V.yourTurn && V.phase === 'crabPile';
+    var crabbing = V.yourTurn && V.phase === 'crab' && V.crabPiles;
+    var stealing = V.yourTurn && V.phase === 'shark';
+
+    var row = el('div', 'tablerow');
+
+    var deckSlot = el('div', 'slot');
+    var back = el('div', 'deckback' + (V.deckCount ? '' : ' empty'));
+    if (canAct && V.deckCount) {
+      back.style.cursor = 'pointer';
+      back.title = 'Draw two, keep one';
+      back.onclick = function () { send({ type: 'drawTwo' }); };
+    }
+    deckSlot.appendChild(back);
+    deckSlot.appendChild(el('div', 'cap', 'Deck <b>' + V.deckCount + '</b>'));
+    row.appendChild(deckSlot);
+
+    for (var i = 0; i < V.pileCount; i++) (function (i) {
+      var slot = el('div', 'slot');
+      var top = V.discardTops[i];
+      var node = top ? cardEl(top) : el('div', 'emptypile', 'empty');
+      if (canAct && top) {
+        node.classList.add('pick');
+        node.onclick = function () { send({ type: 'takeDiscard', pile: i }); };
+      }
+      if (choosingPile) {
+        if (V.discardCounts[i]) {
+          slot.classList.add('target');
+          node.classList.add('pick');
+          node.style.cursor = 'pointer';
+          node.onclick = function () { send({ type: 'crabPickPile', pile: i }); };
+        } else {
+          slot.classList.add('spent');
+        }
+      }
+      if (keeping && keepChoice != null) {
+        slot.classList.add('target');
+        node.classList.add('pick');
+        node.style.cursor = 'pointer';
+        node.onclick = function () {
+          send({ type: 'keepCard', keepIndex: keepChoice, pile: i });
+          keepChoice = null;
+        };
+      }
+      slot.appendChild(node);
+      slot.appendChild(el('div', 'cap', 'Pile ' + (i + 1) + ' <b>' + V.discardCounts[i] + '</b>'));
+      if (keeping && keepChoice != null) slot.appendChild(el('div', 'drop', 'discard here'));
+      if (choosingPile) slot.appendChild(el('div', 'drop', V.discardCounts[i] ? 'search here' : 'empty'));
+      row.appendChild(slot);
+    })(i);
+
+    table.appendChild(row);
+    if (keeping) table.appendChild(drawTray(V));
+    if (choosingPile) table.appendChild(crabPrompt(V));
+    if (crabbing) table.appendChild(crabTray(V));
+    if (stealing) table.appendChild(stealTray(V));
+  }
+
+  function stealTray(V) {
+    var box = el('div', 'stealtray');
+    box.appendChild(el('div', 'traylab', 'Swimmer + Shark \u2014 reach into a hand and take a card'));
+    V.players.forEach(function (p) {
+      if (p.isYou) return;
+      // whoever called Last Chance has locked their cards; show that rather than
+      // offering a fan that cannot be tapped
+      var locked = V.lastChance && V.lastChance.callerId === p.id;
+      var row = el('div', 'stealrow');
+      row.appendChild(el('div', 'who', esc(p.name) +
+        (locked ? ' \u2014 locked, they called Last Chance' : (p.handCount ? '' : ' \u2014 nothing to take'))));
+      if (p.handCount && !locked) {
+        var fan = el('div', 'fan');
+        for (var i = 0; i < p.handCount; i++) (function (i) {
+          var b = el('button', 'cardback');
+          b.type = 'button';
+          b.setAttribute('data-steal', p.id + ':' + i);
+          b.setAttribute('aria-label', 'Take card ' + (i + 1) + ' of ' + p.handCount + ' from ' + p.name);
+          b.title = 'Face down \u2014 take your chances';
+          b.innerHTML = '<span class="num">' + (i + 1) + '</span>';
+          b.onclick = function () { send({ type: 'sharkSteal', targetId: p.id, cardIndex: i }); };
+          fan.appendChild(b);
+        })(i);
+        row.appendChild(fan);
+      }
+      box.appendChild(row);
+    });
+    return box;
+  }
+
+  function drawTray(V) {
+    var tray = el('div', 'tray');
+    tray.appendChild(el('div', 'traylab', keepChoice == null
+      ? 'You drew two \u2014 tap the one you want to keep'
+      : 'Now tap a pile above to discard the ' + esc(V.drawn[1 - keepChoice].color + ' ' + T[V.drawn[1 - keepChoice].type].name)));
+    var cards = el('div', 'traycards');
+    V.drawn.forEach(function (c, i) {
+      var node = cardEl(c, { cls: 'pick' + (keepChoice === i ? ' sel' : (keepChoice != null ? ' dim' : '')) });
+      node.onclick = function () { keepChoice = i; renderGame(); };
+      cards.appendChild(node);
+    });
+    tray.appendChild(cards);
+    return tray;
+  }
+
+  function crabPrompt(V) {
+    var box = el('div', 'crabtray');
+    box.appendChild(el('div', 'traylab', 'Crab pair \u2014 choose one pile to search'));
+    box.appendChild(el('div', 'traynote',
+      'You commit before you look, and you only get to see the pile you pick.'));
+    return box;
+  }
+
+  function crabTray(V) {
+    var pile = V.crabPile;
+    var cards = V.crabPiles[pile] || [];
+    var box = el('div', 'crabtray');
+    box.appendChild(el('div', 'traylab', 'Pile ' + (pile + 1) + ' \u2014 take any one card'));
+    box.appendChild(el('div', 'pilelab', cards.length + ' card' + (cards.length === 1 ? '' : 's') + ', oldest first'));
+    var strip = el('div', 'strip');
+    cards.forEach(function (c) {
+      var node = cardEl(c, { cls: 'pick' });
+      node.onclick = function () { send({ type: 'crabTake', pile: pile, cardId: c.id }); };
+      strip.appendChild(node);
+    });
+    box.appendChild(strip);
+    return box;
+  }
+
+  function stat(label, value, hot) {
+    var s = el('div', 'stat' + (hot ? ' hot' : ''));
+    s.innerHTML = '<i>' + esc(label) + '</i><b>' + esc(value) + '</b>';
+    return s;
+  }
+
+  function toggleSelect(id) {
+    var i = App.selected.indexOf(id);
+    if (i >= 0) App.selected.splice(i, 1);
+    else {
+      App.selected.push(id);
+      if (App.selected.length > 2) App.selected.shift();
+    }
+    renderGame();
+  }
+
+  function selectionIsDuo(V) {
+    if (App.selected.length !== 2) return false;
+    return (V.you.pairsAvailable || []).some(function (p) {
+      return (p.cardIds[0] === App.selected[0] && p.cardIds[1] === App.selected[1]) ||
+        (p.cardIds[0] === App.selected[1] && p.cardIds[1] === App.selected[0]);
+    }) || validDuo(V);
+  }
+
+  function validDuo(V) {
+    var cards = V.you.hand.filter(function (c) { return App.selected.indexOf(c.id) >= 0; });
+    if (cards.length !== 2) return false;
+    var a = T[cards[0].type], b = T[cards[1].type];
+    return a.kind === 'duo' && b.kind === 'duo' && a.partner === cards[1].type && b.partner === cards[0].type;
+  }
+
+  function renderActions(V) {
+    var bar = $('actions');
+    bar.innerHTML = '';
+    var hint = el('div', 'hint');
+    bar.appendChild(hint);
+
+    function add(label, cls, fn, disabled, title) {
+      var b = el('button', 'btn ' + (cls || ''), label);
+      b.disabled = !!disabled;
+      if (title) b.title = title;
+      b.onclick = fn;
+      bar.appendChild(b);
+      return b;
+    }
+
+    if (V.phase === 'gameEnd' || V.phase === 'roundEnd') {
+      hint.textContent = 'Scores are on screen.';
+      return;
+    }
+    if (!V.yourTurn) {
+      var cur = V.players.filter(function (p) { return p.id === V.turnId; })[0];
+      hint.textContent = 'Waiting for ' + (cur ? cur.name : 'the next player') + '.';
+      // A seat can stall for two reasons: a person who has dropped out, or a bot
+      // whose turn did not fire. Either way the host gets a way to move things on.
+      if (App.mode === 'host' || App.mode === 'solo') {
+        if (cur && !cur.connected && !cur.bot) {
+          add('Play this turn for ' + cur.name, '', autoPlayStuckSeat);
+        } else if (cur && cur.bot && App.stalled) {
+          hint.textContent = (cur.name || 'That bot') + ' seems stuck. Nudge them on.';
+          add('Play ' + cur.name + '\u2019s turn', 'primary', autoPlayStuckSeat);
+        }
+      }
+      return;
+    }
+
+    if (V.phase === 'action') {
+      if (V.mustPass) {
+        hint.textContent = 'Nothing left to draw. You have to pass.';
+        add('Pass', 'primary', function () { send({ type: 'endTurn' }); });
+        return;
+      }
+      hint.textContent = 'Draw two and keep one, or take the face-up card from a pile.';
+      add('Draw two', 'primary', function () { send({ type: 'drawTwo' }); }, !V.deckCount);
+      for (var pi = 0; pi < V.pileCount; pi++) (function (pi) {
+        var label = V.pileCount > 2 ? 'Take ' + (pi + 1) : 'Take pile ' + (pi + 1);
+        add(label, '', function () { send({ type: 'takeDiscard', pile: pi }); }, !V.discardCounts[pi],
+          'Take the face-up card from pile ' + (pi + 1));
+      })(pi);
+      return;
+    }
+
+    if (V.phase === 'keep') {
+      hint.textContent = keepChoice == null
+        ? 'Tap a drawn card to keep it, then pick a pile for the other.'
+        : 'Keeping the ' + V.drawn[keepChoice].color + ' ' + T[V.drawn[keepChoice].type].name + '. Where does the other go?';
+      V.discardTops.forEach(function (top, pile) {
+        var label = V.pileCount > 2 ? 'To pile ' + (pile + 1) : 'Discard to pile ' + (pile + 1);
+        add(label, keepChoice == null ? '' : 'primary', function () {
+          send({ type: 'keepCard', keepIndex: keepChoice, pile: pile });
+          keepChoice = null;
+        }, keepChoice == null, top ? 'Currently ' + top.color + ' ' + T[top.type].name : 'Empty pile');
+      });
+      return;
+    }
+
+    if (V.phase === 'hurricane') {
+      hint.textContent = 'Hurricane: choose who to trade your whole hand and table with.';
+      V.players.forEach(function (p) {
+        if (p.isYou) return;
+        var locked = V.lastChance && V.lastChance.callerId === p.id;
+        add('Swap with ' + p.name, locked ? '' : 'danger', function () {
+          send({ type: 'hurricaneSwap', targetId: p.id });
+        }, locked, locked ? 'They called Last Chance \u2014 their cards are locked' :
+          p.handCount + ' in hand, ' + p.pairs.length + ' pair(s) down');
+      });
+      return;
+    }
+
+    if (V.phase === 'crabPile') {
+      hint.textContent = 'Crab pair: pick a pile to search. You choose before you look inside.';
+      for (var cp = 0; cp < V.pileCount; cp++) (function (cp) {
+        add('Search pile ' + (cp + 1), V.discardCounts[cp] ? 'primary' : '', function () {
+          send({ type: 'crabPickPile', pile: cp });
+        }, !V.discardCounts[cp], V.discardCounts[cp] + ' card(s) in this pile');
+      })(cp);
+      return;
+    }
+
+    if (V.phase === 'crab') {
+      hint.textContent = 'Take any card from pile ' + ((V.crabPile || 0) + 1) + '.';
+      return;
+    }
+
+    if (V.phase === 'shark') {
+      hint.textContent = 'Swimmer and Shark: tap any card in a rival hand. They are face down, so it is still a gamble.';
+      return;
+    }
+
+    if (V.phase === 'pair') {
+      var canPair = selectionIsDuo(V);
+      hint.textContent = 'Optional: play as many duos as you can make, then end your turn.';
+      var storm = (V.you.hand || []).filter(function (c) { return c.type === 'hurricane'; })[0];
+      if (storm) {
+        var canSwap = V.players.some(function (p) {
+          return !p.isYou && !(V.lastChance && V.lastChance.callerId === p.id);
+        });
+        add('Play Hurricane', 'danger', function () {
+          if (confirm('Play the Hurricane? You will trade your entire hand and table with a rival, and the card costs you 5 points.')) {
+            send({ type: 'playHurricane', cardId: storm.id });
+          }
+        }, !canSwap, canSwap ? 'Trade everything with a rival' : 'Nobody available to swap with');
+      }
+      add('Play duo', 'primary', function () {
+        send({ type: 'playPair', cardIds: App.selected.slice() });
+        App.selected = [];
+      }, !canPair, canPair ? '' : 'Select a matching duo in your hand');
+      add('End turn', '', function () { send({ type: 'endTurn' }); });
+      if (V.canDeclare) {
+        add('Stop', 'primary', function () {
+          if (confirm('Call STOP? The round ends now and everyone scores their cards.')) send({ type: 'declare', kind: 'stop' });
+        }, false, 'End the round and score');
+        if (!V.noLastChance) add('Last Chance', 'danger', function () {
+          if (confirm('Call LAST CHANCE? Everyone else gets one more turn. Stay ahead and you gain a colour bonus; fall behind and you lose everything in your hand.')) {
+            send({ type: 'declare', kind: 'last' });
+          }
+        }, false, 'Risky: bonus if you stay ahead');
+      } else if (!V.lastChance) {
+        var need = V.config.stopThreshold - (V.you ? V.you.points : 0);
+        hint.textContent += '  You need ' + need + ' more point' + (need === 1 ? '' : 's') + ' to declare.';
+      }
+      return;
+    }
+
+    hint.textContent = 'Waiting\u2026';
+  }
+
+  function renderLog(V) {
+    var box = $('loglist');
+    box.innerHTML = '';
+    V.log.slice().reverse().forEach(function (l) {
+      box.appendChild(el('div', l.tone || '', esc(l.text)));
+    });
+  }
+
+  /* ---------------- scoring overlay ---------------- */
+  var keepChoice = null;
+
+  function renderOverlay(V) {
+    var host = $('overlay');
+    host.innerHTML = '';
+    if (V.phase !== 'gameEnd' && V.phase !== 'roundEnd') {
+      host.classList.add('hidden');
+      clearTimeout(App.readyTimer);
+      App.readyTimer = null;
+      App.readyWaitOver = false;
+      App.readyRound = null;
+      return;
+    }
+    // give people ten seconds before the host may push on without them
+    if (V.phase === 'roundEnd' && App.readyRound !== V.roundNo) {
+      App.readyRound = V.roundNo;
+      App.readyWaitOver = false;
+      clearTimeout(App.readyTimer);
+      App.readyTimer = setTimeout(function () {
+        App.readyWaitOver = true;
+        if (App.view) renderGame();
+      }, 10000);
+    }
+    if (V.phase === 'gameEnd') reportGame(V);
+    host.classList.remove('hidden');
+    host.appendChild(scoreSheet(V));
+  }
+
+  function sheet(title, sub, pinned) {
+    var s = el('div', 'sheet' + (pinned ? ' pinned' : ''));
+    var head = el('div', 'sheethead');
+    head.innerHTML = '<h3>' + esc(title) + '</h3>' + (sub ? '<p class="sub">' + esc(sub) + '</p>' : '');
+    s.appendChild(head);
+    var body = el('div', 'sheetbody');
+    s.appendChild(body);
+    s.body = body;
+    return s;
+  }
+
+  function scoreSheet(V) {
+    var R = V.roundResult;
+    var over = V.phase === 'gameEnd';
+    var title, sub;
+    if (over && R && (R.reason === 'sweep' || R.reason === 'mermaids')) {
+      var w = V.players.filter(function (p) { return p.id === V.winnerId; })[0];
+      var def = T[R.sweepType] || T.mermaid;
+      var plural = def.plural || (def.name + 's');
+      var words = { 3: 'three', 4: 'all four' };
+      title = (w ? w.name : 'Someone') + ' swept ' + (words[def.sweep] || def.sweep) + ' ' + plural;
+      sub = (def.sweep === 3 ? 'Three ' : 'Four ') + plural + ' ends the game on the spot, whatever the scores.';
+    } else if (over) {
+      var wn = V.players.filter(function (p) { return p.id === V.winnerId; })[0];
+      title = (wn ? wn.name : 'Someone') + ' wins';
+      sub = 'First past ' + V.config.targetScore + ' points.';
+    } else if (!R) {
+      title = 'Round over'; sub = '';
+    } else if (R.reason === 'deck') {
+      title = 'The deck ran dry';
+      sub = 'Nobody scores this round.';
+    } else if (R.reason === 'stop') {
+      var c = V.players.filter(function (p) { return p.id === R.callerId; })[0];
+      title = (c ? c.name : 'Someone') + ' called Stop';
+      sub = 'Everyone scores the cards they hold.';
+    } else {
+      var lc = V.players.filter(function (p) { return p.id === R.callerId; })[0];
+      title = 'Last Chance ' + (R.success ? 'held' : 'broke');
+      sub = R.success
+        ? (lc ? lc.name : 'The caller') + ' stayed ahead and takes the colour bonus. Everyone else keeps only what was on the table.'
+        : (lc ? lc.name : 'The caller') + ' was overtaken and keeps only what was on the table.';
+    }
+
+    var s = sheet(title, sub, true);
+    var body = s.body;
+
+    if (R && R.tide) {
+      var tstrip = el('div', 'tide');
+      tstrip.style.marginBottom = '12px';
+      tstrip.innerHTML = '<span class="chip">Tide</span><b>' + esc(R.tide.name) + '</b><span>' + esc(R.tide.blurb) + '</span>';
+      body.appendChild(tstrip);
+    }
+
+    if (R) {
+      var rows = R.rows.slice().sort(function (a, b) { return b.points - a.points; });
+      rows.forEach(function (r) {
+        var isWinner = over && r.id === V.winnerId;
+        var box = el('div', 'score' + (isWinner ? ' win' : (r.mode === 'played' ? ' lose' : '')));
+        var change = (App.ratingChanges || []).filter(function (c) { return c.name === r.name; })[0];
+        var top = el('div', 'top');
+        top.innerHTML = '<span>' + esc(r.name) + '</span>' +
+          (r.bonusApplied ? '<span class="badge hot">colour bonus</span>' : '') +
+          (r.mode === 'played' ? '<span class="badge">hand forfeited</span>' : '') +
+          '<span class="n"><b>+' + r.points + '</b> &nbsp;\u2192 ' + r.total + '</span>';
+        box.appendChild(top);
+        // Show the actual cards under each line, so the arithmetic is visible
+        // rather than asserted.
+        var lines = el('div', 'lines');
+        if (!r.detail.lines.length) {
+          lines.appendChild(el('div', 'entry', '<div class="head"><span>Nothing scored</span><span>0</span></div>'));
+        }
+        var shown = {};
+        r.detail.lines.forEach(function (l) {
+          var entry = el('div', 'entry' + (l.pts < 0 ? ' sting' : ''));
+          entry.appendChild(el('div', 'head',
+            '<span>' + esc(l.label) + '</span><span>' + (l.pts > 0 ? '+' : '') + l.pts + '</span>'));
+
+          var row = el('div', 'shots');
+          (l.cards || []).forEach(function (c) {
+            shown[c.id] = true;
+            row.appendChild(cardEl(c, { small: true }));
+          });
+          // Cards being counted rather than consumed — the colour group a Mermaid
+          // scores, or the group behind the colour bonus — sit dimmed after an arrow.
+          if (l.counted && l.counted.length) {
+            if (row.childNodes.length) row.appendChild(el('span', 'arrow', '\u2192'));
+            l.counted.forEach(function (c) { row.appendChild(cardEl(c, { mini: true, cls: 'ghost' })); });
+          }
+          if (row.childNodes.length) entry.appendChild(row);
+          lines.appendChild(entry);
+        });
+        if (change) {
+          var rl = el('div', 'ratingline');
+          rl.innerHTML = 'Rating <b>' + change.before + '</b> \u2192 <b>' + change.after + '</b> ' +
+            '<span class="' + (change.delta >= 0 ? 'up' : 'down') + '">' +
+            (change.delta >= 0 ? '+' : '') + change.delta + '</span>';
+          top.appendChild(rl);
+        }
+        box.appendChild(lines);
+
+        // anything that earned nothing still gets shown, so the hand is complete
+        var leftovers = [];
+        (r.pairs || []).forEach(function (pr) {
+          pr.cards.forEach(function (c) { if (!shown[c.id]) leftovers.push(c); });
+        });
+        (r.hand || []).forEach(function (c) { if (!shown[c.id]) leftovers.push(c); });
+        if (leftovers.length) {
+          var rest = el('div', 'entry muted');
+          rest.appendChild(el('div', 'head', '<span>Scored nothing</span><span>0</span>'));
+          var restRow = el('div', 'shots');
+          leftovers.forEach(function (c) { restRow.appendChild(cardEl(c, { small: true, cls: 'ghost' })); });
+          rest.appendChild(restRow);
+          box.appendChild(rest);
+        }
+        body.appendChild(box);
+      });
+    }
+
+    // running session record, so a night of play keeps its own story
+    var anyRecord = V.players.some(function (p) { return p.roundsWon || p.gamesWon; });
+    if (anyRecord) {
+      var rec = el('div', 'record');
+      rec.appendChild(el('div', 'reclab', 'This session'));
+      var table = el('div', 'rectable');
+      V.players.slice().sort(function (a, b) {
+        return (b.gamesWon - a.gamesWon) || (b.roundsWon - a.roundsWon);
+      }).forEach(function (p) {
+        var line = el('div', 'recrow' + (p.isYou ? ' me' : ''));
+        line.innerHTML = '<span>' + esc(p.name) + '</span>' +
+          '<b>' + p.roundsWon + '</b><i>' + (p.roundsWon === 1 ? 'round' : 'rounds') + '</i>' +
+          '<b>' + p.gamesWon + '</b><i>' + (p.gamesWon === 1 ? 'game' : 'games') + '</i>';
+        table.appendChild(line);
+      });
+      rec.appendChild(table);
+      body.appendChild(rec);
+    }
+
+    var btns = el('div', 'row sheetfoot');
+    var amHost = App.mode === 'host' || App.mode === 'solo';
+    if (over) {
+      if (amHost) {
+        var again = el('button', 'btn primary', 'Play again');
+        again.onclick = function () { send({ type: 'newGame' }); };
+        btns.appendChild(again);
+      } else {
+        btns.appendChild(el('div', 'notice', 'Waiting for the host to start another game.'));
+      }
+      var leave = el('button', 'btn ghost', 'Back to the menu');
+      leave.onclick = function () { location.reload(); };
+      btns.appendChild(leave);
+    } else {
+      // Everybody says when they have finished reading; only then does the host deal.
+      var waitingFor = V.players.filter(function (p) { return !V.ready[p.id]; });
+      var youReady = V.youReady;
+
+      if (!youReady) {
+        var rdy = el('button', 'btn primary', 'I\u2019m ready');
+        rdy.onclick = function () { send({ type: 'ready' }); };
+        btns.appendChild(rdy);
+      } else if (waitingFor.length) {
+        btns.appendChild(el('div', 'notice',
+          'Waiting for ' + waitingFor.map(function (p) { return esc(p.name); }).join(', ') + '.'));
+      }
+
+      if (amHost) {
+        if (V.allReady) {
+          var next = el('button', 'btn primary', 'Deal the next round');
+          next.onclick = function () { send({ type: 'nextRound' }); };
+          btns.appendChild(next);
+        } else if (App.readyWaitOver) {
+          var force = el('button', 'btn', 'Deal anyway');
+          force.title = 'Start the next round without waiting';
+          force.onclick = function () { send({ type: 'nextRound' }); };
+          btns.appendChild(force);
+        }
+      } else if (V.allReady) {
+        btns.appendChild(el('div', 'notice', 'Everyone is ready. Waiting for the host to deal.'));
+      }
+    }
+    s.appendChild(btns);
+    return s;
+  }
+
+  /* ---------------- rules sheet ---------------- */
+  function chartRow(type) {
+    var d = T[type], cells = [];
+    for (var n = 1; n < d.chart.length; n++) cells.push('<td class="n">' + d.chart[n] + '</td>');
+    while (cells.length < 6) cells.push('<td class="n">\u2014</td>');
+    return '<tr><td>' + d.name + '</td>' + cells.join('') + '</tr>';
+  }
+
+  function openRules() {
+    var host = $('modal');
+    host.classList.remove('hidden');
+    host.innerHTML = '';
+    var s = el('div', 'sheet');
+    s.innerHTML =
+      '<h3>How to play</h3>' +
+      '<div class="rules">' +
+      '<p>A set-collection game for 2\u20134. You gather cards from a shared deck and two face-up piles, then choose the moment to stop the round while you are ahead.</p>' +
+
+      '<h4>Your turn</h4>' +
+      '<ul>' +
+      '<li>Do one of: <b>draw two</b> from the deck, keep one and discard the other face up onto either pile; or <b>take the top card</b> of either pile.</li>' +
+      '<li>Then you may play <b>one duo pair</b> from your hand face up in front of you and use its effect.</li>' +
+      '<li>Then end your turn \u2014 or, if you have at least <code>' + (App.view ? App.view.config.stopThreshold : 7) + '</code> points, declare.</li>' +
+      '</ul>' +
+
+      '<h4>Duo effects</h4>' +
+      '<ul>' +
+      '<li><b>Crab + Crab</b> \u2014 look through either discard pile and take any one card.</li>' +
+      '<li><b>Boat + Boat</b> \u2014 take another turn straight away.</li>' +
+      '<li><b>Fish + Fish</b> \u2014 draw the top card of the deck.</li>' +
+      '<li><b>Swimmer + Shark</b> \u2014 steal one card at random from a player you choose.</li>' +
+      '</ul>' +
+      '<p>Each pair on the table is worth 1 point, whatever the effect was.</p>' +
+
+      '<h4>Collections</h4>' +
+      '<table class="chart"><thead><tr><th>Card</th><th>\u00d71</th><th>\u00d72</th><th>\u00d73</th><th>\u00d74</th><th>\u00d75</th><th>\u00d76</th></tr></thead><tbody>' +
+      chartRow('shell') + chartRow('octopus') + chartRow('penguin') + chartRow('sailor') +
+      '</tbody></table>' +
+      '<p>Collector cards stay hidden in your hand until the round is scored.</p>' +
+
+      '<h4>Mermaids</h4>' +
+      '<ul>' +
+      '<li>Each Mermaid scores the number of cards you own in one colour \u2014 counting your hand <i>and</i> the pairs on your table.</li>' +
+      '<li>Two Mermaids must score two different colours, three must score three, and so on. The app always assigns your best colours first.</li>' +
+      '<li>Hold all four Mermaids and you win the whole game immediately.</li>' +
+      '</ul>' +
+
+      '<h4>Ending a round</h4>' +
+      '<ul>' +
+      '<li><b>Stop</b> \u2014 the round ends at once and everyone scores every card they hold.</li>' +
+      '<li><b>Last Chance</b> \u2014 every other player takes one more turn. If you still have the highest score you add a bonus equal to your largest colour group, and everyone else scores only the pairs on their table. If anyone catches or passes you, they take that bonus instead and you score only your pairs.</li>' +
+      '<li>If the deck runs out, the round ends and nobody scores.</li>' +
+      '</ul>' +
+
+      '<h4>Winning</h4>' +
+      '<p>Round scores add up. Once someone reaches <code>' + (App.view ? App.view.config.targetScore : 40) + '</code> points the game ends and the highest total wins. The host can change both thresholds in the lobby.</p>' +
+
+      '<h4>The deck</h4>' +
+      '<p>58 cards: 9 Crab, 8 Boat, 7 Fish, 7 Swimmer, 7 Shark, 6 Shell, 5 Octopus, 4 Mermaid, 3 Penguin, 2 Sailor, spread across seven colours.</p>' +
+      houseRulesHtml() +
+      '</div>';
+    var close = el('button', 'btn primary wide', 'Got it');
+    close.onclick = function () { host.classList.add('hidden'); };
+    s.appendChild(close);
+    host.appendChild(s);
+    host.onclick = function (e) { if (e.target === host) host.classList.add('hidden'); };
+  }
+
+  function activeRules() {
+    if (App.view && App.view.config) {
+      var c = App.view.config;
+      return {
+        stormSeason: !!c.stormSeason, pile3: c.pileCount === 3,
+        openSea: !!c.openSea, jellyfish: !!c.jellyfish, hurricane: !!c.hurricane,
+        tideKey: c.tideKey || null,
+        tableLog: c.tableLog !== false
+      };
+    }
+    return App.rules;
+  }
+
+  function houseRulesHtml() {
+    var r = activeRules();
+    var on = RULE_TOGGLES.filter(function (t) {
+      return t.notableWhen === 'off' ? !r[t.key] : !!r[t.key];
+    });
+    var html = '<h4>House rules</h4>';
+    if (!on.length) {
+      return html + '<p>None switched on \u2014 this is the plain game. The host can add Storm Season, a third pile, Open Sea or Jellyfish from the lobby.</p>';
+    }
+    html += '<ul>' + on.map(function (t) {
+      var name = t.notableWhen === 'off' ? t.name + ' switched off' : t.name;
+      return '<li><b>' + esc(name) + '</b> \u2014 ' + esc(t.blurb) + '</li>';
+    }).join('') + '</ul>';
+
+    if (r.jellyfish) {
+      html += '<table class="chart"><thead><tr><th>Card</th><th>\u00d71</th><th>\u00d72</th><th>\u00d73</th></tr></thead><tbody>' +
+        '<tr><td>Jellyfish</td><td class="n">\u22123</td><td class="n">\u22126</td><td class="n">win</td></tr>' +
+        '</tbody></table>' +
+        '<p>Holding a third Jellyfish ends the game on the spot and you win, whatever the scores \u2014 the same way four Mermaids do. So the first two are a real cost you carry while you gamble on finding the third.</p>' +
+        '<p>Jellyfish still count towards your colour groups, so a sting can quietly feed a Mermaid. If you lose a Last Chance you forfeit your hand \u2014 stings included.</p>';
+    }
+    if (r.stormSeason) {
+      var fixed = r.tideKey ? SSP.tideByKey({ jellyfish: r.jellyfish }, r.tideKey) : null;
+      if (fixed) {
+        html += '<p>This table plays one fixed condition every round:</p><ul><li><b>' +
+          esc(fixed.name) + '</b> \u2014 ' + esc(fixed.blurb) + '</li></ul>';
+      } else {
+        html += '<p>The tide in force is shown above the table and again on the scoring sheet. The conditions are:</p><ul>' +
+          SSP.tidePool({ jellyfish: r.jellyfish }).map(function (t) {
+            return '<li><b>' + esc(t.name) + '</b> \u2014 ' + esc(t.blurb) + '</li>';
+          }).join('') + '</ul>';
+      }
+    }
+    return html;
+  }
+
+  /* ---------------- leaderboard ---------------- */
+
+  function boardFetch(path, opts) {
+    if (!LEADERBOARD.url) return Promise.reject(new Error('no leaderboard'));
+    if (typeof fetch !== 'function') return Promise.reject(new Error('no fetch here'));
+    try {
+    var ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    var timer = setTimeout(function () { if (ctl) ctl.abort(); }, 6000);
+    var init = opts || {};
+    if (ctl) init.signal = ctl.signal;
+      return fetch(LEADERBOARD.url.replace(/\/$/, '') + path, init)
+        .then(function (r) {
+          clearTimeout(timer);
+          if (!r.ok) throw new Error('http ' + r.status);
+          return r.json();
+        }, function (e) { clearTimeout(timer); throw e; });
+    } catch (e) {
+      clearTimeout(timer);
+      return Promise.reject(e);
+    }
+  }
+
+  function loadLeaderboard() {
+    var box = $('board-body');
+    if (!box) return;
+    box.innerHTML = '<div class="boardnote">Loading\u2026</div>';
+    boardFetch('/leaderboard').then(function (data) {
+      App.board = data;
+      renderLeaderboard();
+    }, function () {
+      App.board = null;
+      box.innerHTML = '<div class="boardnote">The leaderboard is not reachable right now. ' +
+        'Games still work as normal.</div>';
+      var c = $('board-count');
+      if (c) c.textContent = '';
+    });
+  }
+
+  function renderLeaderboard() {
+    var box = $('board-body');
+    if (!box) return;
+    var data = App.board;
+    if (!data) return;
+
+    var count = $('board-count');
+    if (count) {
+      var n = data.totalGames || 0;
+      count.innerHTML = '<b>' + n.toLocaleString() + '</b>' +
+        (n === 1 ? 'game played here' : 'games played here');
+    }
+
+    var rows = (data.players || []).filter(function (p) {
+      return App.boardHumansOnly ? !p.bot : true;
+    });
+
+    box.innerHTML = '';
+    if (!rows.length) {
+      box.appendChild(el('div', 'boardnote', App.boardHumansOnly
+        ? 'No rated people yet \u2014 finish a game to appear here.'
+        : 'Nobody has finished a game yet.'));
+      return;
+    }
+
+    rows.forEach(function (p, i) {
+      var row = el('div', 'boardrow' + (p.bot ? ' isbot' : ''));
+      row.innerHTML =
+        '<span class="rank">' + (i + 1) + '</span>' +
+        '<span class="who">' + esc(p.name) + (p.bot ? ' <i class="tag">bot</i>' : '') + '</span>' +
+        '<span class="rating">' + p.rating + (p.provisional ? '<i class="prov">?</i>' : '') + '</span>' +
+        '<span class="rec">' + p.gamesWon + '/' + p.games + '</span>';
+      box.appendChild(row);
+    });
+  }
+
+  // Only the host reports, and only when a game actually finishes.
+  function reportGame(V) {
+    if (!LEADERBOARD.url || !LEADERBOARD.token) return;
+    if (typeof fetch !== 'function') return;
+    if (!(App.mode === 'host' || App.mode === 'solo')) return;
+    if (V.phase !== 'gameEnd') return;
+    if (App.reportedGame) return;
+    App.reportedGame = true;
+
+    var players = V.players.map(function (p) {
+      return { name: p.name, bot: !!p.bot, score: p.total };
+    });
+    if (players.length < 2) return;
+
+    boardFetch('/result', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Token': LEADERBOARD.token },
+      body: JSON.stringify({ players: players })
+    }).then(function (res) {
+      App.ratingChanges = res.changes || null;
+      App.board = null;
+      if (App.view) renderGame();
+    }, function () { /* silence is fine: the game does not depend on this */ });
+  }
+
+  /* ---------------- a small celebration ---------------- */
+
+  // Names get a numeric suffix when they collide, so "Ester 2" still counts.
+  function isEster(name) {
+    return /^ester$/i.test(String(name || '').trim().replace(/\s+\d+$/, ''));
+  }
+
+  function celebrate() {
+    if (App.partyOpen) return;
+    App.partyOpen = true;
+
+    var host = $('party');
+    host.innerHTML = '';
+    host.classList.remove('hidden');
+
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!reduce) {
+      var sky = el('div', 'confetti');
+      var colors = SSP.COLORS;
+      for (var i = 0; i < 340; i++) {
+        var bit = el('span', i % 3 === 0 ? 'bao' : 'bit');
+        bit.style.left = (Math.random() * 100).toFixed(2) + '%';
+        bit.style.animationDelay = (Math.random() * 2.6).toFixed(2) + 's';
+        bit.style.animationDuration = (2.6 + Math.random() * 2.6).toFixed(2) + 's';
+        if (bit.className === 'bao') {
+          bit.innerHTML = ICONS.bao;
+          bit.style.color = 'var(--pearl)';
+          var size = 18 + Math.round(Math.random() * 22);
+          bit.style.width = size + 'px';
+          bit.style.height = size + 'px';
+        } else {
+          bit.style.background = 'var(--' + colors[i % colors.length] + ')';
+          bit.style.width = (6 + Math.round(Math.random() * 6)) + 'px';
+          bit.style.height = (9 + Math.round(Math.random() * 8)) + 'px';
+        }
+        sky.appendChild(bit);
+      }
+      host.appendChild(sky);
+    }
+
+    var card = el('div', 'partycard');
+    card.innerHTML =
+      '<div class="baobig">' + ICONS.bao + '</div>' +
+      '<h3>Happy National Bao Day!</h3>' +
+      '<p>Maybe you\u2019ll beat me with one of these modes \uD83D\uDE09</p>';
+    var close = el('button', 'btn primary wide heart', '\u2764\uFE0F');
+    close.setAttribute('aria-label', 'Close');
+    close.onclick = function () {
+      host.classList.add('hidden');
+      host.innerHTML = '';
+      App.partyOpen = false;
+    };
+    card.appendChild(close);
+    host.appendChild(card);
+
+    setTimeout(function () {
+      var sk = host.querySelector('.confetti');
+      if (sk && sk.parentNode) sk.parentNode.removeChild(sk);
+    }, 9000);
+  }
+
+  // Only Ester's own device celebrates; nobody else at the table sees it.
+  function checkForEster(seats) {
+    var mine = (seats || []).filter(function (seat) { return seat.id === App.myId; })[0];
+    var name = mine ? mine.name : App.name;
+    if (!isEster(name)) return;
+    if (App.partiedFor.seated) return;
+    App.partiedFor.seated = true;
+    celebrate();
+  }
+
+  /* ---------------- wiring ---------------- */
+  function nameValue() {
+    var v = $('name').value.trim().slice(0, 16);
+    return v || 'Player';
+  }
+
+  function init() {
+    var saved = null;
+    try { saved = window.localStorage ? localStorage.getItem('tf-name') : null; } catch (e) {}
+    if (saved) $('name').value = saved;
+
+    var hash = (location.hash || '').replace('#', '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (hash.length === 4) { $('joincode').value = hash; }
+
+    function remember() { try { localStorage.setItem('tf-name', nameValue()); } catch (e) {} }
+
+    $('btn-host').onclick = function () { App.name = nameValue(); remember(); hostTable(); };
+    $('btn-showjoin').onclick = function () { App.name = nameValue(); remember(); setJoinStatus(''); show('screen-join'); $('joincode').focus(); };
+    $('btn-solo').onclick = function () {
+      App.name = nameValue(); remember();
+      soloLobby(parseInt($('botcount').value, 10) || 1);
+    };
+    var nameField = $('name');
+    function esterWatch() {
+      var v = nameField.value.trim();
+      if (isEster(v)) {
+        if (!App.partiedFor['typed']) { App.partiedFor['typed'] = true; celebrate(); }
+      } else {
+        delete App.partiedFor['typed'];
+      }
+    }
+    nameField.addEventListener('change', esterWatch);
+    nameField.addEventListener('blur', esterWatch);
+    nameField.addEventListener('input', function () {
+      if (isEster(nameField.value)) esterWatch();
+      else delete App.partiedFor['typed'];
+    });
+
+    $('btn-board-all').onclick = function () {
+      App.boardHumansOnly = false;
+      $('btn-board-all').classList.remove('ghost');
+      $('btn-board-humans').classList.add('ghost');
+      renderLeaderboard();
+    };
+    $('btn-board-humans').onclick = function () {
+      App.boardHumansOnly = true;
+      $('btn-board-humans').classList.remove('ghost');
+      $('btn-board-all').classList.add('ghost');
+      renderLeaderboard();
+    };
+    try { loadLeaderboard(); } catch (e) { /* never let the board block the menu */ }
+
+    $('btn-rules').onclick = openRules;
+    $('btn-rules2').onclick = openRules;
+
+    $('btn-join').onclick = function () {
+      var code = $('joincode').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (code.length !== 4) { setJoinStatus('Table codes are four characters.', true); return; }
+      App.name = nameValue(); remember();
+      joinTable(code);
+    };
+    $('btn-backmenu').onclick = function () { show('screen-menu'); };
+    $('joincode').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('btn-join').click(); });
+
+    $('btn-start').onclick = startGame;
+
+    $('btn-addbot').onclick = function () {
+      if (App.seats.length >= MAX_PLAYERS) { toast('The table is full.'); return; }
+      var taken = {};
+      App.seats.forEach(function (x) { taken[x.name] = true; });
+      var free = BOT_NAMES.filter(function (n) { return !taken[n]; });
+      if (!free.length) { toast('No spare bot names.'); return; }
+      var name = SSP.shuffle(free)[0];
+      App.seats.push({ id: 'bot' + Date.now().toString(36), name: name, bot: true, connected: true });
+      renderLobby();
+      broadcastLobby();
+    };
+
+    $('btn-dropbot').onclick = function () {
+      for (var i = App.seats.length - 1; i >= 0; i--) {
+        if (App.seats[i].bot) { App.seats.splice(i, 1); break; }
+      }
+      renderLobby();
+      broadcastLobby();
+    };
+    $('btn-copy').onclick = function () {
+      var link = location.origin + location.pathname + '#' + App.code;
+      var text = 'Join my table \u2014 code ' + App.code + ' \u2014 ' + link;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { toast('Invite copied'); }, function () { prompt('Copy this:', text); });
+      } else { prompt('Copy this:', text); }
+    };
+    $('btn-leave').onclick = function () { if (confirm('Leave the table?')) location.reload(); };
+
+    $('btn-log').onclick = function () {
+      var list = $('loglist');
+      var nowHidden = list.classList.toggle('hidden');
+      $('btn-log').textContent = nowHidden ? 'Show table log' : 'Hide table log';
+      $('btn-log').setAttribute('aria-expanded', nowHidden ? 'false' : 'true');
+    };
+
+    ['cfg-threshold', 'cfg-target'].forEach(function (id) {
+      $(id).addEventListener('input', function () {
+        $(id).dataset.touched = '1';
+        broadcastLobby();
+      });
+    });
+
+    var presetBtns = document.querySelectorAll('.presets [data-preset]');
+    for (var pb = 0; pb < presetBtns.length; pb++) {
+      (function (btn) {
+        btn.onclick = function () { applyPreset(btn.getAttribute('data-preset')); };
+      })(presetBtns[pb]);
+    }
+
+    renderToggles();
+
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden && (App.mode === 'host' || App.mode === 'solo') && App.state) scheduleBot();
+    });
+
+    window.addEventListener('beforeunload', function (e) {
+      if (App.mode === 'host' && App.started) { e.preventDefault(); e.returnValue = ''; }
+    });
+
+    show('screen-menu');
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+</script>
+</body>
+</html>
